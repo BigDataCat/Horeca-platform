@@ -1,4 +1,12 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createApi } from "./api";
+import AlertsView from "./views/AlertsView";
+import IntegrationsView from "./views/IntegrationsView";
+import InventoryView from "./views/InventoryView";
+import RecipesView from "./views/RecipesView";
+import ReportsView from "./views/ReportsView";
+import SalesView from "./views/SalesView";
+import SettingsView from "./views/SettingsView";
 
 type Company = {
   id: number;
@@ -80,6 +88,11 @@ type POSIntegration = {
   config: Record<string, unknown> | null;
   last_sync_cursor: string | null;
   last_synced_at: string | null;
+  webhook_configured: boolean;
+  sync_interval_minutes: number | null;
+  next_sync_at: string | null;
+  consecutive_failures: number;
+  sync_paused_reason: string | null;
   active: boolean;
 };
 
@@ -167,6 +180,12 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  type Tab = "overview" | "sales" | "inventory" | "recipes" | "reports" | "integrations" | "alerts" | "settings";
+  const [tab, setTab] = useState<Tab>("overview");
+  const api = useMemo(
+    () => (token ? createApi(token, () => { localStorage.removeItem(TOKEN_KEY); setToken(null); setCurrentUser(null); }) : null),
+    [token],
+  );
 
   async function readError(response: Response, fallback: string) {
     const body = await response.json().catch(() => null);
@@ -717,7 +736,24 @@ function App() {
         </button>
       </header>
 
+      <nav className="tabs">
+        {([
+          ["overview", "Overview"],
+          ["sales", "Sales"],
+          ["inventory", "Inventory"],
+          ["recipes", "Recipes & costs"],
+          ["reports", "Reports"],
+          ["integrations", "Integrations"],
+          ["alerts", "Alerts"],
+          ["settings", "Settings"],
+        ] as [Tab, string][]).map(([key, label]) => (
+          <button key={key} type="button" className={tab === key ? "active" : "secondary"} onClick={() => setTab(key)}>{label}</button>
+        ))}
+      </nav>
+
       {error && <p className="error">{error}</p>}
+
+      {tab === "overview" && (<>
 
       {dashboard && (
         <section className="card">
@@ -1134,6 +1170,36 @@ function App() {
         </table></div>
       </section>
 
+      </>)}
+
+      {api && currentUser && (() => {
+        const viewProps = {
+          api,
+          role: currentUser.role,
+          locations,
+          products,
+          integrations,
+          refreshProducts: async () => { await loadProducts(); },
+          refreshIntegrations: async () => { await loadIntegrations(); },
+        };
+        return (
+          <>
+            {tab === "sales" && <SalesView {...viewProps} />}
+            {tab === "inventory" && <InventoryView {...viewProps} />}
+            {tab === "recipes" && <RecipesView {...viewProps} />}
+            {tab === "reports" && <ReportsView {...viewProps} />}
+            {tab === "integrations" && <IntegrationsView {...viewProps} />}
+            {tab === "alerts" && <AlertsView {...viewProps} />}
+            {tab === "settings" && (
+              <SettingsView
+                {...viewProps}
+                onSignedOutEverywhere={logout}
+                onPasswordChanged={(newToken) => { localStorage.setItem(TOKEN_KEY, newToken); setToken(newToken); }}
+              />
+            )}
+          </>
+        );
+      })()}
     </main>
   );
 }

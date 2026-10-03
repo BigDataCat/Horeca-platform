@@ -13,7 +13,12 @@ def resolve_unit_cost(
     location_id: int | None,
     at: datetime | None = None,
 ) -> ProductCost | None:
-    """Latest cost effective at ``at``: the location-specific one, else the global one."""
+    """Latest cost effective at ``at``.
+
+    With a location: that location's cost, else the company-wide cost. Without a location
+    (company-wide view): the company-wide cost, else the most recently recorded cost of any
+    location (e.g. from a goods receipt), so single-site companies get a cost without extra setup.
+    """
     at = at or datetime.now(timezone.utc)
 
     def latest(location_filter) -> ProductCost | None:
@@ -34,4 +39,7 @@ def resolve_unit_cost(
         if cost is not None:
             return cost
 
-    return latest(ProductCost.location_id.is_(None))
+    cost = latest(ProductCost.location_id.is_(None))
+    if cost is None and location_id is None:
+        cost = latest(ProductCost.location_id.is_not(None))
+    return cost

@@ -105,3 +105,20 @@ def test_cost_validation(client, tenant_a):
             json={"product_id": product["id"], "unit_cost": bad, "effective_from": "2026-01-01T00:00:00Z"},
         )
         assert response.status_code == 422
+
+
+def test_company_wide_view_falls_back_to_latest_location_cost(client, tenant_a):
+    """A goods receipt records a location cost; a company-wide recipe must still be costable."""
+    recipe, beef, bun = burger_recipe(client, tenant_a)
+    main = create_location(client, tenant_a, "Main")
+    other = create_location(client, tenant_a, "Other")
+    set_cost(client, tenant_a, beef, "40", "2026-01-01T00:00:00Z", location=other)
+    set_cost(client, tenant_a, beef, "50", "2026-02-01T00:00:00Z", location=main)
+    set_cost(client, tenant_a, bun, "1", location=main)
+    result = recipe_cost(client, tenant_a, recipe)
+    by_ingredient = {l["ingredient_product_id"]: l for l in result["lines"]}
+    assert Decimal(by_ingredient[beef["id"]]["unit_cost"]) == Decimal("50")  # newest across locations
+    assert Decimal(result["total_cost"]) == Decimal("11")
+    # a specific location still only uses its own or global costs
+    other_view = recipe_cost(client, tenant_a, recipe, other)
+    assert other_view["total_cost"] is None  # no bun cost for "Other" and no global cost
