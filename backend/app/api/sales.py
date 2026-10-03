@@ -56,6 +56,7 @@ def list_unmatched_products(
         .where(
             Sale.company_id == current_user.company_id,
             SaleLine.product_id.is_(None),
+            Sale.integration_id.is_not(None),
             SaleLine.external_product_id.is_not(None),
         )
         .group_by(
