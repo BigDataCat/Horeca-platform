@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from app.core.config import settings
+from app.core.database import SessionLocal
 
 from app.api.auth import router as auth_router
 from app.api.inventory import router as inventory_router
@@ -20,7 +23,7 @@ app = FastAPI(title="HoReCa Management Platform API", version="1.3.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,4 +47,6 @@ app.include_router(users_router, prefix="/api")
 
 @app.get("/health", tags=["system"])
 def health_check() -> dict[str, str]:
-    return {"status": "ok"}
+    with SessionLocal() as db:
+        db.execute(text("SELECT 1"))
+    return {"status": "ok", "database": "ok"}
