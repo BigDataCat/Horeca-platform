@@ -8,12 +8,13 @@ from app.models.pos_integration import POSIntegration
 from app.models.sale import Sale, SaleLine
 from app.models.user import User
 from app.schemas.sales import (
+    SaleStatusChange,
     SaleRead,
     SalesImportRequest,
     SalesImportResult,
     UnmatchedProductRead,
 )
-from app.services.sales_ingestion import import_sale
+from app.services.sales_ingestion import change_sale_status, import_sale
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
@@ -38,6 +39,24 @@ def list_sales(
     )
 
 
+@router.post("/{sale_id}/status", response_model=SaleRead)
+def change_status(
+    sale_id: int,
+    payload: SaleStatusChange,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Sale:
+    """Cancel or refund a sale (full sale). Ingredient consumption is given back to stock."""
+    require_manager(current_user)
+    sale = db.get(Sale, sale_id)
+    if sale is None or sale.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale not found")
+    if not change_sale_status(db, sale, payload.status, payload.reason):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Sale is already {sale.status}")
+    db.commit()
+    return db.scalar(select(Sale).options(selectinload(Sale.lines)).where(Sale.id == sale.id))
+
+
 @router.get("/unmatched-products", response_model=list[UnmatchedProductRead])
 def list_unmatched_products(
     current_user: User = Depends(get_current_user),
@@ -55,6 +74,7 @@ def list_unmatched_products(
         .join(Sale, Sale.id == SaleLine.sale_id)
         .where(
             Sale.company_id == current_user.company_id,
+            Sale.status == "completed",
             SaleLine.product_id.is_(None),
             Sale.integration_id.is_not(None),
             SaleLine.external_product_id.is_not(None),

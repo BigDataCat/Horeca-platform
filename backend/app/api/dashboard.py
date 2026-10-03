@@ -26,8 +26,17 @@ def dashboard_summary(
             func.coalesce(func.sum(Sale.net_value), 0),
             func.coalesce(func.sum(Sale.tax_value), 0),
             func.coalesce(func.sum(Sale.gross_value), 0),
-        ).where(Sale.company_id == current_user.company_id)
+        ).where(Sale.company_id == current_user.company_id, Sale.status == "completed")
     ).one()
+
+    cancelled_sales = int(
+        db.scalar(
+            select(func.count(Sale.id)).where(
+                Sale.company_id == current_user.company_id, Sale.status != "completed"
+            )
+        )
+        or 0
+    )
 
     sales_count = int(sales[0] or 0)
     revenue = Decimal(str(sales[1] or 0))
@@ -40,6 +49,7 @@ def dashboard_summary(
             .join(Sale, Sale.id == SaleLine.sale_id)
             .where(
                 Sale.company_id == current_user.company_id,
+                Sale.status == "completed",
                 SaleLine.product_id.is_(None),
                 SaleLine.external_product_id.is_not(None),
             )
@@ -72,6 +82,7 @@ def dashboard_summary(
 
     return DashboardSummary(
         sales_count=sales_count,
+        cancelled_sales=cancelled_sales,
         revenue=revenue,
         tax=tax,
         gross_revenue=gross_revenue,

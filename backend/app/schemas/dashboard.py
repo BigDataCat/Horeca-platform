@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class DashboardSummary(BaseModel):
     sales_count: int
+    cancelled_sales: int = 0
     revenue: Decimal
     tax: Decimal
     gross_revenue: Decimal

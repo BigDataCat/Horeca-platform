@@ -42,6 +42,7 @@ class StockMovement(TimestampMixin, Base):
     reference_id: Mapped[str | None] = mapped_column(String(200))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     note: Mapped[str | None] = mapped_column(String(500))
+    sale_id: Mapped[int | None] = mapped_column(ForeignKey("sales.id", ondelete="SET NULL"), index=True)
 
     company: Mapped["Company"] = relationship()
     location: Mapped["Location"] = relationship()

@@ -42,6 +42,9 @@ class Sale(TimestampMixin, Base):
     tax_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
     gross_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     source_payload: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="completed", server_default="completed")
+    status_reason: Mapped[str | None] = mapped_column(String(500))
+    status_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     location: Mapped["Location"] = relationship()
     integration: Mapped["POSIntegration | None"] = relationship()

@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -84,7 +84,10 @@ def import_sale(
     db: Session,
     integration: POSIntegration,
     canonical_sale: CanonicalSale,
+    status: str = "completed",
+    reason: str | None = None,
 ) -> bool:
+    """Persist a sale. Non-completed sales are stored without touching stock."""
     duplicate = db.scalar(
         select(Sale).where(
             Sale.company_id == integration.company_id,
@@ -107,7 +110,11 @@ def import_sale(
         tax_value=canonical_sale.tax_value,
         gross_value=canonical_sale.gross_value,
         source_payload=json.dumps(canonical_sale.model_dump(mode="json")),
+        status=status,
+        status_reason=reason,
+        status_changed_at=datetime.now(timezone.utc) if status != "completed" else None,
     )
+    consumption: list[tuple[Product, Decimal]] = []
 
     for line in canonical_sale.lines:
         product = resolve_product(
@@ -144,6 +151,15 @@ def import_sale(
         )
 
         if product is not None:
+            consumption.append((product, quantity))
+
+    db.add(sale)
+    # Flush so the sale has an id (stock movements link to it) and is visible to the
+    # duplicate check for later sales in the same batch.
+    db.flush()
+
+    if status == "completed":
+        for product, quantity in consumption:
             apply_recipe_consumption(
                 db,
                 integration,
@@ -151,11 +167,8 @@ def import_sale(
                 quantity,
                 canonical_sale.external_id,
                 canonical_sale.occurred_at,
+                sale.id,
             )
-
-    db.add(sale)
-    # Make the new sale visible to the duplicate check for later sales in the same batch.
-    db.flush()
     return True
 
 
@@ -166,6 +179,7 @@ def apply_recipe_consumption(
     sold_quantity: Decimal,
     sale_external_id: str,
     occurred_at: datetime,
+    sale_id: int,
 ) -> None:
     recipe = db.scalar(
         select(Recipe).where(
@@ -223,6 +237,83 @@ def apply_recipe_consumption(
             uom=normalized_uom,
             reference_type="sale",
             reference_id=sale_external_id,
+            sale_id=sale_id,
             occurred_at=occurred_at,
             note="Recipe consumption: " + recipe.name,
         ))
+
+
+def reverse_sale_consumption(db: Session, sale: Sale, occurred_at: datetime) -> int:
+    """Give back the ingredients a sale consumed. Returns the number of reversal movements."""
+    consumed = db.scalars(
+        select(StockMovement).where(
+            StockMovement.company_id == sale.company_id,
+            StockMovement.sale_id == sale.id,
+            StockMovement.movement_type == "recipe_consumption",
+        )
+    ).all()
+    for movement in consumed:
+        stock = db.scalar(
+            select(ProductStock).where(
+                ProductStock.company_id == movement.company_id,
+                ProductStock.location_id == movement.location_id,
+                ProductStock.product_id == movement.product_id,
+            )
+        )
+        if stock is None:
+            continue
+        stock.quantity -= movement.quantity  # consumption movements are negative
+        db.add(
+            StockMovement(
+                company_id=movement.company_id,
+                location_id=movement.location_id,
+                product_id=movement.product_id,
+                movement_type="sale_reversal",
+                quantity=-movement.quantity,
+                uom=movement.uom,
+                reference_type="sale",
+                reference_id=sale.external_id,
+                sale_id=sale.id,
+                occurred_at=occurred_at,
+                note=f"Reversal of {movement.note or 'recipe consumption'}",
+            )
+        )
+    return len(consumed)
+
+
+def change_sale_status(
+    db: Session,
+    sale: Sale,
+    new_status: str,
+    reason: str | None = None,
+) -> bool:
+    """Cancel or refund a completed sale and restore stock. Idempotent: returns False if already changed."""
+    if sale.status != "completed":
+        return False
+    now = datetime.now(timezone.utc)
+    reverse_sale_consumption(db, sale, now)
+    sale.status = new_status
+    sale.status_reason = reason
+    sale.status_changed_at = now
+    return True
+
+
+def apply_sale_status_event(
+    db: Session,
+    integration: POSIntegration,
+    canonical_sale: CanonicalSale,
+    new_status: str,
+    reason: str | None = None,
+) -> bool:
+    """Handle a cancel/refund event from a POS. If the sale was never received (events can
+    arrive out of order) it is stored as already cancelled so a late "created" event is a no-op."""
+    sale = db.scalar(
+        select(Sale).where(
+            Sale.company_id == integration.company_id,
+            Sale.integration_id == integration.id,
+            Sale.external_id == canonical_sale.external_id,
+        )
+    )
+    if sale is None:
+        return import_sale(db, integration, canonical_sale, status=new_status, reason=reason)
+    return change_sale_status(db, sale, new_status, reason)

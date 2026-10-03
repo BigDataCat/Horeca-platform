@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from app.models.pos_integration import POSIntegration
 from app.models.webhook_event import WebhookEvent
 from app.schemas.sales import CanonicalSale
-from app.services.sales_ingestion import import_sale
+from app.services.sales_ingestion import apply_sale_status_event, import_sale
+
+STATUS_EVENTS = {"sale.cancelled": "cancelled", "sale.refunded": "refunded"}
 
 
 def process_webhook_event(db: Session, integration: POSIntegration, event: WebhookEvent) -> bool:
@@ -20,7 +22,11 @@ def process_webhook_event(db: Session, integration: POSIntegration, event: Webho
     try:
         sale = CanonicalSale.model_validate(json.loads(event.payload or "{}").get("sale"))
         event.attempts += 1
-        imported = import_sale(db, integration, sale)
+        new_status = STATUS_EVENTS.get(event.event_type)
+        if new_status is not None:
+            imported = apply_sale_status_event(db, integration, sale, new_status)
+        else:
+            imported = import_sale(db, integration, sale)
         event.status = "processed" if imported else "duplicate_sale"
         event.error_message = None
         event.processed_at = datetime.now(timezone.utc)

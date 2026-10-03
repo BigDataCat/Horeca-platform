@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -68,6 +69,13 @@ class SaleRead(BaseModel):
     net_value: Decimal
     tax_value: Decimal
     gross_value: Decimal
+    status: str
+    status_reason: str | None = None
     lines: list[SaleLineRead]
 
     model_config = {"from_attributes": True}
+
+
+class SaleStatusChange(BaseModel):
+    status: Literal["cancelled", "refunded"]
+    reason: str | None = Field(default=None, max_length=500)
