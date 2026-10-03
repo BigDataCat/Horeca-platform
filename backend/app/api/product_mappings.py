@@ -82,20 +82,6 @@ def create_mapping(
     return mapping
 
 
-@router.delete("/{mapping_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_mapping(
-    mapping_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> None:
-    require_manager(current_user)
-
-    mapping = db.get(ProductMapping, mapping_id)
-    if mapping is None or mapping.company_id != current_user.company_id:
-        raise HTTPException(status_code=404, detail="Product mapping not found")
-
-    db.delete(mapping)
-    db.commit()
 
 
 @router.get("/uom-conversions", response_model=list[ProductUOMConversionRead])
@@ -130,6 +116,9 @@ def create_uom_conversion(
 
     from_uom = payload.from_uom.upper()
     to_uom = payload.to_uom.upper()
+
+    if from_uom == to_uom:
+        raise HTTPException(status_code=400, detail="Source and target UOM must be different")
 
     conversion = ProductUOMConversion(
         company_id=current_user.company_id,
@@ -166,4 +155,20 @@ def delete_uom_conversion(
         raise HTTPException(status_code=404, detail="UOM conversion not found")
 
     db.delete(conversion)
+    db.commit()
+
+
+@router.delete("/{mapping_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_mapping(
+    mapping_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    require_manager(current_user)
+
+    mapping = db.get(ProductMapping, mapping_id)
+    if mapping is None or mapping.company_id != current_user.company_id:
+        raise HTTPException(status_code=404, detail="Product mapping not found")
+
+    db.delete(mapping)
     db.commit()
