@@ -50,3 +50,12 @@ class ConnectionTestResult(BaseModel):
     provider: str
     success: bool
     message: str
+
+
+
+class POSSyncResult(BaseModel):
+    integration_id: int
+    provider: str
+    fetched: int
+    imported: int
+    skipped_duplicates: int
