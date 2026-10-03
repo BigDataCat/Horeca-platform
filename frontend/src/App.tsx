@@ -41,6 +41,18 @@ type POSProvider = {
   capabilities: string[];
 };
 
+type SyncRun = {
+  id: number;
+  integration_id: number;
+  started_at: string;
+  finished_at: string | null;
+  status: string;
+  fetched: number;
+  imported: number;
+  skipped_duplicates: number;
+  error_message: string | null;
+};
+
 type POSIntegration = {
   id: number;
   company_id: number;
@@ -87,6 +99,7 @@ function App() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [integrations, setIntegrations] = useState<POSIntegration[]>([]);
+  const [syncRuns, setSyncRuns] = useState<Record<number, SyncRun[]>>({});
   const [posProviders, setPosProviders] = useState<POSProvider[]>([]);
   const [products, setProducts] = useState<{ id: number; name: string; sku: string | null; base_uom: string; active: boolean }[]>([]);
   const [mappings, setMappings] = useState<{ id: number; integration_id: number; external_product_id: string; external_product_name: string | null; product_id: number; match_method: string }[]>([]);
@@ -282,6 +295,14 @@ function App() {
     setNewIntegrationBaseUrl("");
     setNewIntegrationAccountId("");
     await loadIntegrations();
+  }
+
+  async function loadSyncRuns(id: number) {
+    if (!token) return;
+    const response = await apiFetch(`/integrations/pos/${id}/sync-runs`, {}, token);
+    if (!response.ok) { setError(await readError(response, "Could not load sync history.")); return; }
+    const data: SyncRun[] = await response.json();
+    setSyncRuns((current) => ({ ...current, [id]: data }));
   }
 
   async function testIntegration(id: number) {
@@ -889,7 +910,7 @@ function App() {
                     {(currentUser.role === "owner" || currentUser.role === "manager") && integration.active && (
                       <>
                         <button type="button" className="secondary" onClick={() => void testIntegration(integration.id)}>Test</button>
-                        <button type="button" className="secondary" onClick={() => void syncIntegration(integration.id)}>Sync</button>
+                        <button type="button" className="secondary" onClick={() => void syncIntegration(integration.id)}>Sync</button><button type="button" className="secondary" onClick={() => void loadSyncRuns(integration.id)}>History</button>
                         <button type="button" className="danger" onClick={() => void deactivateIntegration(integration.id)}>Deactivate</button>
                       </>
                     )}
@@ -899,6 +920,41 @@ function App() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="card">
+        <div className="section-heading">
+          <div>
+            <h2>Sync History</h2>
+            <p className="subtitle">Audit trail for POS synchronization runs.</p>
+          </div>
+        </div>
+        {Object.entries(syncRuns).length === 0 ? (
+          <p>Load history from a POS integration to see its synchronization runs.</p>
+        ) : (
+          Object.entries(syncRuns).map(([integrationId, runs]) => (
+            <div key={integrationId} className="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>Integration</th><th>Started</th><th>Status</th><th>Fetched</th><th>Imported</th><th>Duplicates</th><th>Error</th></tr>
+                </thead>
+                <tbody>
+                  {runs.map((run) => (
+                    <tr key={run.id}>
+                      <td>{integrations.find((i) => i.id === Number(integrationId))?.name ?? integrationId}</td>
+                      <td>{new Date(run.started_at).toLocaleString()}</td>
+                      <td>{run.status}</td>
+                      <td>{run.fetched}</td>
+                      <td>{run.imported}</td>
+                      <td>{run.skipped_duplicates}</td>
+                      <td>{run.error_message ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))
+        )}
       </section>
 
       <section className="card">
