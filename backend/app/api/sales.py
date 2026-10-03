@@ -100,12 +100,16 @@ def import_sales(
     imported = 0
     skipped_duplicates = 0
 
-    for canonical_sale in payload.sales:
-        if import_sale(db, integration, canonical_sale):
-            imported += 1
-        else:
-            skipped_duplicates += 1
+    try:
+        for canonical_sale in payload.sales:
+            if import_sale(db, integration, canonical_sale):
+                imported += 1
+            else:
+                skipped_duplicates += 1
 
-    db.commit()
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     return SalesImportResult(imported=imported, skipped_duplicates=skipped_duplicates)

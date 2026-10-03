@@ -12,6 +12,7 @@ from app.models.location import Location
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.inventory import StockAdjustmentCreate, StockMovementRead, StockRead
+from app.services.sales_ingestion import normalize_quantity
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -61,6 +62,14 @@ def create_adjustment(
     if payload.quantity == 0:
         raise HTTPException(status_code=400, detail="Adjustment quantity cannot be zero")
 
+    # Stock is always held in the product base UOM; convert explicitly or refuse.
+    quantity, uom = normalize_quantity(db, current_user.company_id, product, payload.quantity, payload.uom)
+    if uom != product.base_uom.upper():
+        raise HTTPException(
+            status_code=400,
+            detail=f"No UOM conversion from {payload.uom.upper()} to {product.base_uom.upper()} for this product",
+        )
+
     stock = db.scalar(
         select(ProductStock).where(
             ProductStock.company_id == current_user.company_id,
@@ -74,20 +83,20 @@ def create_adjustment(
             location_id=payload.location_id,
             product_id=payload.product_id,
             quantity=Decimal("0"),
-            uom=payload.uom,
+            uom=uom,
         )
         db.add(stock)
 
-    stock.quantity += payload.quantity
-    stock.uom = payload.uom
+    stock.quantity += quantity
+    stock.uom = uom
 
     movement = StockMovement(
         company_id=current_user.company_id,
         location_id=payload.location_id,
         product_id=payload.product_id,
         movement_type=payload.movement_type,
-        quantity=payload.quantity,
-        uom=payload.uom,
+        quantity=quantity,
+        uom=uom,
         reference_type="manual",
         occurred_at=datetime.now(timezone.utc),
         note=payload.note,

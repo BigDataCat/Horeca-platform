@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -144,7 +145,12 @@ def import_sale(
 
         if product is not None:
             apply_recipe_consumption(
-                db, integration, product, quantity, canonical_sale.external_id
+                db,
+                integration,
+                product,
+                quantity,
+                canonical_sale.external_id,
+                canonical_sale.occurred_at,
             )
 
     db.add(sale)
@@ -159,6 +165,7 @@ def apply_recipe_consumption(
     product: Product,
     sold_quantity: Decimal,
     sale_external_id: str,
+    occurred_at: datetime,
 ) -> None:
     recipe = db.scalar(
         select(Recipe).where(
@@ -216,6 +223,6 @@ def apply_recipe_consumption(
             uom=normalized_uom,
             reference_type="sale",
             reference_id=sale_external_id,
-            occurred_at=integration.updated_at,
+            occurred_at=occurred_at,
             note="Recipe consumption: " + recipe.name,
         ))
