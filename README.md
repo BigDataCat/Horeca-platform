@@ -130,3 +130,17 @@ VITE_API_URL=http://localhost:8000/api
 ## Roadmap
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for remaining work, priorities and phases.
+
+## Tests
+
+Backend tests run against a real PostgreSQL database (the schema is built with Alembic, so the migrations are exercised too):
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+# create a throwaway database, e.g. horeca_test, then:
+export TEST_DATABASE_URL=postgresql+psycopg://horeca:change-me@localhost:5432/horeca_test
+pytest
+```
+
+Warning: the test database is dropped and recreated on every run. Never point `TEST_DATABASE_URL` at real data.
