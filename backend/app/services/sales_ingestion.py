@@ -8,6 +8,8 @@ from app.models.pos_integration import POSIntegration
 from app.models.product import Product
 from app.models.product_mapping import ProductMapping
 from app.models.product_uom_conversion import ProductUOMConversion
+from app.models.recipe import Recipe
+from app.models.inventory import ProductStock, StockMovement
 from app.models.sale import Sale, SaleLine
 from app.schemas.sales import CanonicalSale
 
@@ -140,5 +142,73 @@ def import_sale(
             )
         )
 
+        if product is not None:
+            apply_recipe_consumption(
+                db, integration, product, quantity, canonical_sale.external_id
+            )
+
     db.add(sale)
     return True
+
+
+def apply_recipe_consumption(
+    db: Session,
+    integration: POSIntegration,
+    product: Product,
+    sold_quantity: Decimal,
+    sale_external_id: str,
+) -> None:
+    recipe = db.scalar(
+        select(Recipe).where(
+            Recipe.company_id == integration.company_id,
+            Recipe.product_id == product.id,
+            Recipe.active.is_(True),
+            Recipe.location_id == integration.location_id,
+        )
+    )
+    if recipe is None:
+        recipe = db.scalar(
+            select(Recipe).where(
+                Recipe.company_id == integration.company_id,
+                Recipe.product_id == product.id,
+                Recipe.active.is_(True),
+                Recipe.location_id.is_(None),
+            )
+        )
+    if recipe is None:
+        return
+
+    for line in recipe.lines:
+        ingredient = line.ingredient_product
+        required = sold_quantity * line.quantity * (Decimal("1") + line.waste_factor)
+        normalized_quantity, normalized_uom = normalize_quantity(
+            db, integration.company_id, ingredient, required, line.uom
+        )
+        stock = db.scalar(select(ProductStock).where(
+            ProductStock.company_id == integration.company_id,
+            ProductStock.location_id == integration.location_id,
+            ProductStock.product_id == ingredient.id,
+        ))
+        if stock is None:
+            stock = ProductStock(
+                company_id=integration.company_id,
+                location_id=integration.location_id,
+                product_id=ingredient.id,
+                quantity=Decimal("0"),
+                uom=normalized_uom,
+            )
+            db.add(stock)
+        stock.quantity -= normalized_quantity
+        stock.uom = normalized_uom
+        db.add(StockMovement(
+            company_id=integration.company_id,
+            location_id=integration.location_id,
+            product_id=ingredient.id,
+            movement_type="recipe_consumption",
+            quantity=-normalized_quantity,
+            uom=normalized_uom,
+            reference_type="sale",
+            reference_id=sale_external_id,
+            occurred_at=integration.updated_at,
+            note="Recipe consumption: " + recipe.name,
+        ))
