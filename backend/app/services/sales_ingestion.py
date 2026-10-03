@@ -184,6 +184,11 @@ def apply_recipe_consumption(
         normalized_quantity, normalized_uom = normalize_quantity(
             db, integration.company_id, ingredient, required, line.uom
         )
+        if normalized_uom != ingredient.base_uom.upper():
+            raise ValueError(
+                f"No UOM conversion for recipe ingredient {ingredient.id}: "
+                f"{line.uom} -> {ingredient.base_uom}"
+            )
         stock = db.scalar(select(ProductStock).where(
             ProductStock.company_id == integration.company_id,
             ProductStock.location_id == integration.location_id,
