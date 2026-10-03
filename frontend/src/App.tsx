@@ -64,6 +64,8 @@ type SyncRun = {
   error_message: string | null;
 };
 
+type StockItem = { id: number; location_id: number; product_id: number; quantity: string; uom: string };
+
 type POSIntegration = {
   id: number;
   company_id: number;
@@ -76,6 +78,8 @@ type POSIntegration = {
   external_account_id: string | null;
   credentials_ref: string | null;
   config: Record<string, unknown> | null;
+  last_sync_cursor: string | null;
+  last_synced_at: string | null;
   active: boolean;
 };
 
@@ -113,6 +117,7 @@ function App() {
   const [syncRuns, setSyncRuns] = useState<Record<number, SyncRun[]>>({});
   const [posProviders, setPosProviders] = useState<POSProvider[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [products, setProducts] = useState<{ id: number; name: string; sku: string | null; base_uom: string; active: boolean }[]>([]);
   const [mappings, setMappings] = useState<{ id: number; integration_id: number; external_product_id: string; external_product_name: string | null; product_id: number; match_method: string }[]>([]);
   const [uomConversions, setUomConversions] = useState<{ id: number; product_id: number; from_uom: string; to_uom: string; factor: number }[]>([]);
@@ -268,6 +273,13 @@ function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load locations.");
     }
+  }
+
+  async function loadStock() {
+    if (!token) return;
+    const response = await apiFetch("/inventory/stock", {}, token);
+    if (!response.ok) { setError(await readError(response, "Could not load inventory.")); return; }
+    setStockItems(await response.json());
   }
 
   async function loadDashboard() {
@@ -439,6 +451,7 @@ function App() {
       void loadUsers();
       void loadPosProviders();
       void loadDashboard();
+      void loadStock();
       void loadIntegrations();
       void loadProducts();
       void loadMappings();
@@ -916,6 +929,33 @@ function App() {
       <section className="card">
         <div className="section-heading">
           <div>
+            <h2>Inventory</h2>
+            <p className="subtitle">Current product balances by location.</p>
+          </div>
+          <button type="button" className="secondary" onClick={() => void loadStock()}>Refresh</button>
+        </div>
+        {stockItems.length === 0 ? <p>No stock balances recorded yet.</p> : (
+          <div className="table-wrapper">
+            <table>
+              <thead><tr><th>Location</th><th>Product</th><th>Quantity</th><th>UOM</th></tr></thead>
+              <tbody>
+                {stockItems.map((stock) => (
+                  <tr key={stock.id}>
+                    <td>{locations.find((location) => location.id === stock.location_id)?.name ?? stock.location_id}</td>
+                    <td>{products.find((product) => product.id === stock.product_id)?.name ?? stock.product_id}</td>
+                    <td>{stock.quantity}</td>
+                    <td>{stock.uom}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="card">
+        <div className="section-heading">
+          <div>
             <h2>POS Integrations</h2>
             <p className="subtitle">Connect a POS account to a specific HoReCa location. The integration ID is now managed by the platform.</p>
           </div>
@@ -936,7 +976,7 @@ function App() {
 
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Name</th><th>Provider</th><th>Location</th><th>Connection</th><th>Status</th><th>ID</th><th /></tr></thead>
+            <thead><tr><th>Name</th><th>Provider</th><th>Location</th><th>Connection</th><th>Status</th><th>Last sync</th><th>ID</th><th /></tr></thead>
             <tbody>
               {integrations.map((integration) => (
                 <tr key={integration.id}>
@@ -945,6 +985,7 @@ function App() {
                   <td>{locations.find((l) => l.id === integration.location_id)?.name ?? integration.location_id}</td>
                   <td>{integration.connection_type}</td>
                   <td>{integration.active ? integration.status : "inactive"}</td>
+                  <td>{integration.last_synced_at ? new Date(integration.last_synced_at).toLocaleString() : "Never"}</td>
                   <td>{integration.id}</td>
                   <td className="actions">
                     {(currentUser.role === "owner" || currentUser.role === "manager") && integration.active && (
