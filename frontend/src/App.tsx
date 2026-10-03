@@ -83,7 +83,7 @@ type POSIntegration = {
   active: boolean;
 };
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api";
+const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 const TOKEN_KEY = "horeca_access_token";
 
 async function apiFetch(path: string, options: RequestInit = {}, token?: string) {
