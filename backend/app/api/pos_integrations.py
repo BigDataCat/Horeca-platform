@@ -171,7 +171,8 @@ def sync_integration(
 
     try:
         connector = get_connector(integration.provider)
-        sales = connector.pull_sales(integration)
+        pull_result = connector.pull_sales(integration, integration.last_sync_cursor)
+        sales = pull_result.sales
         sync_run.fetched = len(sales)
 
         for sale in sales:
@@ -180,6 +181,8 @@ def sync_integration(
             else:
                 sync_run.skipped_duplicates += 1
 
+        integration.last_sync_cursor = pull_result.next_cursor
+        integration.last_synced_at = datetime.now(timezone.utc)
         integration.status = "connected"
         sync_run.status = "success"
         sync_run.finished_at = datetime.now(timezone.utc)
