@@ -8,30 +8,72 @@ type Company = {
   active: boolean;
 };
 
+type Location = {
+  id: number;
+  company_id: number;
+  name: string;
+  address: string | null;
+  city: string | null;
+  country: string;
+  active: boolean;
+};
+
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api";
 
 function App() {
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [name, setName] = useState("");
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
+
+  const [companyName, setCompanyName] = useState("");
   const [taxIdentifier, setTaxIdentifier] = useState("");
   const [currency, setCurrency] = useState("RON");
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const [locationName, setLocationName] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [country, setCountry] = useState("RO");
+  const [editingLocationId, setEditingLocationId] = useState<number | null>(null);
+
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [loadingLocations, setLoadingLocations] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   async function loadCompanies() {
-    setLoading(true);
+    setLoadingCompanies(true);
     setError("");
 
     try {
       const response = await fetch(`${API_URL}/companies`);
       if (!response.ok) throw new Error("Could not load companies.");
-      setCompanies(await response.json());
+
+      const data: Company[] = await response.json();
+      setCompanies(data);
+
+      if (selectedCompanyId === null && data.length > 0) {
+        setSelectedCompanyId(data[0].id);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load companies.");
     } finally {
-      setLoading(false);
+      setLoadingCompanies(false);
+    }
+  }
+
+  async function loadLocations(companyId: number) {
+    setLoadingLocations(true);
+    setError("");
+
+    try {
+      const response = await fetch(`${API_URL}/locations?company_id=${companyId}`);
+      if (!response.ok) throw new Error("Could not load locations.");
+
+      setLocations(await response.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load locations.");
+    } finally {
+      setLoadingLocations(false);
     }
   }
 
@@ -39,65 +81,125 @@ function App() {
     void loadCompanies();
   }, []);
 
-  function resetForm() {
-    setName("");
-    setTaxIdentifier("");
-    setCurrency("RON");
-    setEditingId(null);
+  useEffect(() => {
+    if (selectedCompanyId !== null) {
+      void loadLocations(selectedCompanyId);
+    } else {
+      setLocations([]);
+    }
+  }, [selectedCompanyId]);
+
+  function resetLocationForm() {
+    setLocationName("");
+    setAddress("");
+    setCity("");
+    setCountry("RO");
+    setEditingLocationId(null);
   }
 
-  function startEdit(company: Company) {
-    setEditingId(company.id);
-    setName(company.name);
-    setTaxIdentifier(company.tax_identifier ?? "");
-    setCurrency(company.currency);
+  function startEditLocation(location: Location) {
+    setEditingLocationId(location.id);
+    setLocationName(location.name);
+    setAddress(location.address ?? "");
+    setCity(location.city ?? "");
+    setCountry(location.country);
     setError("");
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleCompanySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError("");
 
     try {
-      const isEditing = editingId !== null;
-      const response = await fetch(
-        isEditing ? `${API_URL}/companies/${editingId}` : `${API_URL}/companies`,
-        {
-          method: isEditing ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name,
-            tax_identifier: taxIdentifier || null,
-            currency,
-          }),
-        },
-      );
+      const response = await fetch(`${API_URL}/companies`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: companyName,
+          tax_identifier: taxIdentifier || null,
+          currency,
+        }),
+      });
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        throw new Error(body?.detail ?? "Could not save company.");
+        throw new Error(body?.detail ?? "Could not create company.");
       }
 
-      resetForm();
+      setCompanyName("");
+      setTaxIdentifier("");
+      setCurrency("RON");
       await loadCompanies();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save company.");
+      setError(err instanceof Error ? err.message : "Could not create company.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function deactivateCompany(id: number) {
+  async function handleLocationSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (selectedCompanyId === null) {
+      setError("Select a company before creating a location.");
+      return;
+    }
+
+    setSaving(true);
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/companies/${id}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Could not deactivate company.");
-      if (editingId === id) resetForm();
-      await loadCompanies();
+      const isEditing = editingLocationId !== null;
+      const url = isEditing
+        ? `${API_URL}/locations/${editingLocationId}`
+        : `${API_URL}/locations`;
+
+      const response = await fetch(url, {
+        method: isEditing ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          isEditing
+            ? { name: locationName, address: address || null, city: city || null, country }
+            : {
+                company_id: selectedCompanyId,
+                name: locationName,
+                address: address || null,
+                city: city || null,
+                country,
+              },
+        ),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.detail ?? "Could not save location.");
+      }
+
+      resetLocationForm();
+      await loadLocations(selectedCompanyId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not deactivate company.");
+      setError(err instanceof Error ? err.message : "Could not save location.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deactivateLocation(id: number) {
+    setError("");
+
+    try {
+      const response = await fetch(`${API_URL}/locations/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) throw new Error("Could not deactivate location.");
+
+      if (selectedCompanyId !== null) {
+        await loadLocations(selectedCompanyId);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not deactivate location.");
     }
   }
 
@@ -105,21 +207,33 @@ function App() {
     <main>
       <header>
         <p className="eyebrow">HoReCa Management Platform</p>
-        <h1>Companies</h1>
-        <p className="subtitle">First end-to-end module: React → FastAPI → PostgreSQL.</p>
+        <h1>Company & Location Management</h1>
+        <p className="subtitle">
+          Manage companies and their physical HoReCa locations.
+        </p>
       </header>
 
       <section className="card">
-        <h2>{editingId === null ? "Create company" : "Edit company"}</h2>
-        <form onSubmit={handleSubmit} className="form">
+        <h2>Create company</h2>
+
+        <form onSubmit={handleCompanySubmit} className="form">
           <label>
             Company name
-            <input value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} />
+            <input
+              value={companyName}
+              onChange={(event) => setCompanyName(event.target.value)}
+              required
+              maxLength={200}
+            />
           </label>
 
           <label>
             Tax identifier
-            <input value={taxIdentifier} onChange={(event) => setTaxIdentifier(event.target.value)} maxLength={50} />
+            <input
+              value={taxIdentifier}
+              onChange={(event) => setTaxIdentifier(event.target.value)}
+              maxLength={50}
+            />
           </label>
 
           <label>
@@ -131,20 +245,11 @@ function App() {
             </select>
           </label>
 
-          <div className="form-actions">
-            <button type="submit" disabled={saving}>
-              {saving ? "Saving..." : editingId === null ? "Create company" : "Save changes"}
-            </button>
-            {editingId !== null && (
-              <button type="button" className="secondary" onClick={resetForm}>
-                Cancel
-              </button>
-            )}
-          </div>
+          <button type="submit" disabled={saving}>
+            Create company
+          </button>
         </form>
       </section>
-
-      {error && <p className="error">{error}</p>}
 
       <section className="card">
         <div className="section-heading">
@@ -154,7 +259,7 @@ function App() {
           </button>
         </div>
 
-        {loading ? (
+        {loadingCompanies ? (
           <p>Loading...</p>
         ) : companies.length === 0 ? (
           <p>No companies yet.</p>
@@ -172,27 +277,16 @@ function App() {
               </thead>
               <tbody>
                 {companies.map((company) => (
-                  <tr key={company.id}>
+                  <tr
+                    key={company.id}
+                    className={selectedCompanyId === company.id ? "selected-row" : ""}
+                    onClick={() => setSelectedCompanyId(company.id)}
+                  >
                     <td>{company.name}</td>
                     <td>{company.tax_identifier ?? "—"}</td>
                     <td>{company.currency}</td>
                     <td>{company.active ? "Active" : "Inactive"}</td>
-                    <td className="actions">
-                      {company.active && (
-                        <>
-                          <button type="button" className="secondary" onClick={() => startEdit(company)}>
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="danger"
-                            onClick={() => void deactivateCompany(company.id)}
-                          >
-                            Deactivate
-                          </button>
-                        </>
-                      )}
-                    </td>
+                    <td />
                   </tr>
                 ))}
               </tbody>
@@ -200,6 +294,144 @@ function App() {
           </div>
         )}
       </section>
+
+      <section className="card">
+        <div className="section-heading">
+          <div>
+            <h2>Locations</h2>
+            <p className="subtitle">
+              {selectedCompanyId === null
+                ? "Select a company first."
+                : `Locations for: ${companies.find((company) => company.id === selectedCompanyId)?.name ?? "selected company"}`}
+            </p>
+          </div>
+          {selectedCompanyId !== null && (
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => void loadLocations(selectedCompanyId)}
+            >
+              Refresh
+            </button>
+          )}
+        </div>
+
+        {selectedCompanyId !== null && (
+          <>
+            <form onSubmit={handleLocationSubmit} className="form location-form">
+              <label>
+                Location name
+                <input
+                  value={locationName}
+                  onChange={(event) => setLocationName(event.target.value)}
+                  required
+                  maxLength={200}
+                  placeholder="e.g. Central Restaurant"
+                />
+              </label>
+
+              <label>
+                Address
+                <input
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                  maxLength={300}
+                />
+              </label>
+
+              <label>
+                City
+                <input
+                  value={city}
+                  onChange={(event) => setCity(event.target.value)}
+                  maxLength={100}
+                />
+              </label>
+
+              <label>
+                Country
+                <input
+                  value={country}
+                  onChange={(event) => setCountry(event.target.value.toUpperCase())}
+                  minLength={2}
+                  maxLength={2}
+                  required
+                />
+              </label>
+
+              <div className="form-actions">
+                <button type="submit" disabled={saving}>
+                  {saving
+                    ? "Saving..."
+                    : editingLocationId === null
+                      ? "Create location"
+                      : "Save changes"}
+                </button>
+
+                {editingLocationId !== null && (
+                  <button type="button" className="secondary" onClick={resetLocationForm}>
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </form>
+
+            {loadingLocations ? (
+              <p>Loading locations...</p>
+            ) : locations.length === 0 ? (
+              <p>No locations for this company yet.</p>
+            ) : (
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Address</th>
+                      <th>City</th>
+                      <th>Country</th>
+                      <th>Status</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {locations.map((location) => (
+                      <tr key={location.id}>
+                        <td>{location.name}</td>
+                        <td>{location.address ?? "—"}</td>
+                        <td>{location.city ?? "—"}</td>
+                        <td>{location.country}</td>
+                        <td>{location.active ? "Active" : "Inactive"}</td>
+                        <td className="actions">
+                          {location.active && (
+                            <>
+                              <button
+                                type="button"
+                                className="secondary"
+                                onClick={() => startEditLocation(location)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="danger"
+                                onClick={() => void deactivateLocation(location.id)}
+                              >
+                                Deactivate
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {error && <p className="error">{error}</p>}
     </main>
   );
 }

@@ -2,8 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.companies import router as companies_router
+from app.api.locations import router as locations_router
 
-app = FastAPI(title="HoReCa Management Platform API", version="0.2.0")
+app = FastAPI(title="HoReCa Management Platform API", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,6 +15,8 @@ app.add_middleware(
 )
 
 app.include_router(companies_router, prefix="/api")
+app.include_router(locations_router, prefix="/api")
+
 
 @app.get("/health", tags=["system"])
 def health_check() -> dict[str, str]:

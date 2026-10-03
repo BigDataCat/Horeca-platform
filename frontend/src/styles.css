@@ -11,7 +11,7 @@ body { margin: 0; }
 button, input, select { font: inherit; }
 
 main {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 48px 24px 80px;
 }
@@ -44,6 +44,11 @@ h1, h2 { margin-top: 0; }
   grid-template-columns: 2fr 1.5fr 120px auto;
   gap: 16px;
   align-items: end;
+}
+
+.location-form {
+  grid-template-columns: 1.5fr 2fr 1fr 100px auto;
+  margin: 24px 0;
 }
 
 label {
@@ -96,6 +101,7 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 20px;
 }
 
 .table-wrapper { overflow-x: auto; }
@@ -113,6 +119,22 @@ th, td {
 
 th { font-size: 13px; color: #6b7280; }
 
-@media (max-width: 800px) {
-  .form { grid-template-columns: 1fr; }
+tbody tr { cursor: pointer; }
+
+tbody tr:hover { background: #f9fafb; }
+
+.selected-row { background: #f3f4f6; }
+
+@media (max-width: 1000px) {
+  .form,
+  .location-form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .form,
+  .location-form {
+    grid-template-columns: 1fr;
+  }
 }
