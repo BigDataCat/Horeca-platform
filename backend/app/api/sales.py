@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.api.common import clamp_page, csv_response, set_total
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.pos_integration import POSIntegration
@@ -26,18 +29,84 @@ def require_manager(user: User) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner or manager role required")
 
 
+def sale_query(
+    company_id: int,
+    location_id: int | None,
+    integration_id: int | None,
+    sale_status: str | None,
+    date_from: datetime | None,
+    date_to: datetime | None,
+):
+    query = select(Sale).where(Sale.company_id == company_id)
+    if location_id is not None:
+        query = query.where(Sale.location_id == location_id)
+    if integration_id is not None:
+        query = query.where(Sale.integration_id == integration_id)
+    if sale_status:
+        query = query.where(Sale.status == sale_status)
+    if date_from:
+        query = query.where(Sale.occurred_at >= date_from)
+    if date_to:
+        query = query.where(Sale.occurred_at < date_to)
+    return query
+
+
 @router.get("", response_model=list[SaleRead])
 def list_sales(
+    response: Response,
+    location_id: int | None = None,
+    integration_id: int | None = None,
+    status_filter: str | None = Query(default=None, alias="status"),
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    limit: int = 200,
+    offset: int = 0,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[Sale]:
+    query = sale_query(current_user.company_id, location_id, integration_id, status_filter, date_from, date_to)
+    set_total(response, db, query)
+    limit, offset = clamp_page(limit, offset)
     return list(
         db.scalars(
-            select(Sale)
-            .options(selectinload(Sale.lines))
-            .where(Sale.company_id == current_user.company_id)
-            .order_by(Sale.occurred_at.desc())
+            query.options(selectinload(Sale.lines))
+            .order_by(Sale.occurred_at.desc(), Sale.id.desc())
+            .limit(limit)
+            .offset(offset)
         ).all()
+    )
+
+
+@router.get("/export.csv")
+def export_sales(
+    location_id: int | None = None,
+    integration_id: int | None = None,
+    status_filter: str | None = Query(default=None, alias="status"),
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """One row per sale line (max 50,000 rows)."""
+    query = sale_query(current_user.company_id, location_id, integration_id, status_filter, date_from, date_to)
+    sales = db.scalars(
+        query.options(selectinload(Sale.lines)).order_by(Sale.occurred_at, Sale.id).limit(10000)
+    ).all()
+    rows = []
+    for sale in sales:
+        for sale_line in sale.lines:
+            rows.append(
+                [
+                    sale.external_id, sale.occurred_at.isoformat(), sale.location_id, sale.integration_id, sale.status,
+                    sale.currency, sale_line.product_id, sale_line.external_product_id, sale_line.product_name,
+                    sale_line.quantity, sale_line.uom, sale_line.unit_price, sale_line.net_value, sale_line.tax_value,
+                ]
+            )
+    return csv_response(
+        "sales.csv",
+        ["sale_id", "occurred_at", "location_id", "integration_id", "status", "currency", "product_id",
+         "external_product_id", "product_name", "quantity", "uom", "unit_price", "net_value", "tax_value"],
+        rows[:50000],
     )
 
 

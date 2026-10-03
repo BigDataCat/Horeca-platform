@@ -1,6 +1,7 @@
 from app.models.inventory import ProductStock, StockMovement
 from app.models.recipe import Recipe, RecipeLine
 from app.models.webhook_event import WebhookEvent
+from app.models.audit_log import AuditLog
 from app.models.purchasing import GoodsReceipt, GoodsReceiptLine, Supplier
 from app.models.stock_ops import StockCount, StockCountLine, StockTransfer, StockTransferLine
 from app.models.company import Company
@@ -15,6 +16,7 @@ from app.models.sync_run import SyncRun
 from app.models.user import User
 
 __all__ = [
+    "AuditLog",
     "GoodsReceipt",
     "GoodsReceiptLine",
     "Supplier",

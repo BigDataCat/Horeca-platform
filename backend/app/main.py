@@ -6,6 +6,7 @@ import uuid
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from app.core import audit  # noqa: F401  (registers the audit trail hooks)
 from app.core.config import settings
 from app.core.database import SessionLocal
 
@@ -23,6 +24,8 @@ from app.api.product_mappings import router as product_mappings_router
 from app.api.products import router as products_router
 from app.api.sales import router as sales_router
 from app.api.users import router as users_router
+from app.api.alerts import router as alerts_router
+from app.api.audit import router as audit_router
 from app.api.reports import router as reports_router
 from app.api.purchasing import router as purchasing_router
 from app.api.stock_ops import router as stock_ops_router
@@ -80,6 +83,8 @@ app.include_router(product_mappings_router, prefix="/api")
 app.include_router(products_router, prefix="/api")
 app.include_router(sales_router, prefix="/api")
 app.include_router(users_router, prefix="/api")
+app.include_router(alerts_router, prefix="/api")
+app.include_router(audit_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(purchasing_router, prefix="/api")
 app.include_router(stock_ops_router, prefix="/api")

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -6,6 +8,7 @@ class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=300)
     category: str | None = Field(default=None, max_length=150)
     base_uom: str = Field(default="EA", min_length=1, max_length=20)
+    reorder_level: Decimal | None = Field(default=None, ge=0)
 
 
 class ProductUpdate(BaseModel):
@@ -13,6 +16,7 @@ class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=300)
     category: str | None = Field(default=None, max_length=150)
     base_uom: str | None = Field(default=None, min_length=1, max_length=20)
+    reorder_level: Decimal | None = Field(default=None, ge=0)
     active: bool | None = None
 
 
@@ -23,6 +27,7 @@ class ProductRead(BaseModel):
     name: str
     category: str | None
     base_uom: str
+    reorder_level: Decimal | None = None
     active: bool
 
     model_config = ConfigDict(from_attributes=True)

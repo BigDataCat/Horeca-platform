@@ -71,11 +71,23 @@ after 5 consecutive failures the schedule pauses and `sync_paused_reason` explai
 `sync_interval_minutes` resumes it. Runs stuck in `running` for 15 minutes are marked failed.
 Several workers can run at once.
 
+## Audit log, exports and alerts
+
+- `GET /api/audit-log` (owner/manager): who created/changed/deleted products, costs, recipes, mappings,
+  users, integrations, suppliers, receipts, counts and transfers, plus sale cancellations. Recorded
+  automatically in the same transaction; secrets (passwords, tokens, config values) are never logged.
+- List endpoints accept `limit`/`offset` and return the full count in `X-Total-Count`; sales, movements and
+  stock also accept date/location/status filters. CSV exports: `/api/sales/export.csv`,
+  `/api/inventory/movements/export.csv`, `/api/reports/margins.csv`.
+- `GET /api/alerts` computes operational alerts (low/negative stock via `reorder_level`, failed/paused/stale
+  sync, failed webhooks, unmatched products, missing ingredient costs). There is no notification
+  delivery yet (email/push): alerts are pulled by the UI.
+
 ## Database migrations
 
 The migration chain currently reaches:
 
-`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013 → 0014 → 0015 → 0016 → 0017 → 0018 → 0019`
+`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013 → 0014 → 0015 → 0016 → 0017 → 0018 → 0019 → 0020`
 
 ## Run locally
 
