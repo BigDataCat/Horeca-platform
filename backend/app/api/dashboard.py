@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.inventory import ProductStock
-from app.models.product_cost import ProductCost
 from app.models.sale import Sale, SaleLine
 from app.models.user import User
 from app.schemas.dashboard import DashboardSummary
+from app.services.costing import resolve_unit_cost
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -57,27 +57,12 @@ def dashboard_summary(
     )
 
     stock_value = Decimal("0")
-    stock_rows = db.execute(
-        select(ProductStock, ProductCost)
-        .join(
-            ProductCost,
-            (ProductCost.product_id == ProductStock.product_id)
-            & (ProductCost.company_id == ProductStock.company_id)
-            & (
-                (ProductCost.location_id == ProductStock.location_id)
-                | ProductCost.location_id.is_(None)
-            ),
-            isouter=True,
+    for stock in db.scalars(
+        select(ProductStock).where(ProductStock.company_id == current_user.company_id)
+    ).all():
+        cost = resolve_unit_cost(
+            db, current_user.company_id, stock.product_id, stock.location_id
         )
-        .where(ProductStock.company_id == current_user.company_id)
-        .order_by(ProductStock.id, ProductCost.effective_from.desc())
-    ).all()
-
-    seen_stock: set[int] = set()
-    for stock, cost in stock_rows:
-        if stock.id in seen_stock:
-            continue
-        seen_stock.add(stock.id)
         if cost is not None:
             stock_value += stock.quantity * cost.unit_cost
 

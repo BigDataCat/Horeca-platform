@@ -12,6 +12,7 @@ from app.models.product import Product
 from app.models.product_cost import ProductCost
 from app.models.recipe import Recipe
 from app.models.user import User
+from app.services.costing import resolve_unit_cost
 from app.schemas.costs import ProductCostCreate, ProductCostRead, RecipeCostLineRead, RecipeCostRead
 
 router = APIRouter(prefix="/costs", tags=["costs"])
@@ -80,42 +81,19 @@ def calculate_recipe_cost(
     missing_cost = False
 
     for line in recipe.lines:
-        cost = db.scalar(
-            select(ProductCost)
-            .where(
-                ProductCost.company_id == current_user.company_id,
-                ProductCost.product_id == line.ingredient_product_id,
-                ProductCost.effective_from <= datetime.now(timezone.utc),
-                (
-                    ProductCost.location_id == target_location_id
-                    if target_location_id is not None
-                    else ProductCost.location_id.is_(None)
-                ),
-            )
-            .order_by(ProductCost.effective_from.desc())
+        cost = resolve_unit_cost(
+            db, current_user.company_id, line.ingredient_product_id, target_location_id
         )
-        if cost is None:
-            cost = db.scalar(
-                select(ProductCost)
-                .where(
-                    ProductCost.company_id == current_user.company_id,
-                    ProductCost.product_id == line.ingredient_product_id,
-                    ProductCost.location_id.is_(None),
-                    ProductCost.effective_from <= datetime.now(timezone.utc),
-                )
-                .order_by(ProductCost.effective_from.desc())
-            )
 
         line_cost = None
         unit_cost = None
-        if cost is not None and not missing_cost:
+        if cost is None:
+            missing_cost = True
+        else:
             unit_cost = cost.unit_cost
             line_cost = line.quantity * (Decimal("1") + line.waste_factor) * cost.unit_cost
             total += line_cost
             currency = cost.currency
-        elif cost is None:
-            missing_cost = True
-            total = None
 
         lines.append(
             RecipeCostLineRead(
@@ -131,6 +109,6 @@ def calculate_recipe_cost(
         recipe_id=recipe.id,
         recipe_name=recipe.name,
         currency=currency,
-        total_cost=total,
+        total_cost=None if missing_cost else total,
         lines=lines,
     )
