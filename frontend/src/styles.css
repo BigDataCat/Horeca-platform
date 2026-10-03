@@ -5,18 +5,32 @@
 }
 
 * { box-sizing: border-box; }
-
 body { margin: 0; }
-
 button, input, select { font: inherit; }
 
 main {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 48px 24px 80px;
 }
 
+.auth-page {
+  max-width: 520px;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.auth-card { width: 100%; }
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
 header { margin-bottom: 28px; }
+.topbar { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; }
 
 .eyebrow {
   margin: 0 0 8px;
@@ -27,7 +41,6 @@ header { margin-bottom: 28px; }
 }
 
 h1, h2 { margin-top: 0; }
-
 .subtitle { color: #6b7280; }
 
 .card {
@@ -44,6 +57,16 @@ h1, h2 { margin-top: 0; }
   grid-template-columns: 2fr 1.5fr 120px auto;
   gap: 16px;
   align-items: end;
+}
+
+.location-form {
+  grid-template-columns: 1.5fr 2fr 1fr 100px auto;
+  margin: 24px 0;
+}
+
+.user-form {
+  grid-template-columns: 1fr 1fr 1.5fr 1.2fr 130px auto;
+  margin: 24px 0;
 }
 
 label {
@@ -72,13 +95,11 @@ button {
 }
 
 button:disabled { opacity: .6; cursor: not-allowed; }
-
 .secondary { background: #e5e7eb; color: #111827; }
-
 .danger { background: #b91c1c; }
+.full-width { width: 100%; }
 
-.form-actions,
-.actions {
+.form-actions, .actions {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -96,23 +117,24 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 20px;
 }
 
 .table-wrapper { overflow-x: auto; }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th, td {
-  padding: 12px 10px;
-  border-bottom: 1px solid #e5e7eb;
-  text-align: left;
-}
-
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 12px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; }
 th { font-size: 13px; color: #6b7280; }
 
-@media (max-width: 800px) {
-  .form { grid-template-columns: 1fr; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: #f9fafb; }
+.selected-row { background: #f3f4f6; }
+
+@media (max-width: 1000px) {
+  .form, .location-form, .user-form { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 650px) {
+  .form, .location-form, .user-form { grid-template-columns: 1fr; }
+  .topbar { flex-direction: column; }
 }
