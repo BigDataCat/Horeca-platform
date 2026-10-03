@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.models.pos_integration import POSIntegration
 from app.models.product import Product
+from app.models.product_mapping import ProductMapping
+from app.models.product_uom_conversion import ProductUOMConversion
 from app.models.sale import Sale, SaleLine
 from app.schemas.sales import CanonicalSale
 
@@ -13,14 +15,24 @@ from app.schemas.sales import CanonicalSale
 def resolve_product(
     db: Session,
     company_id: int,
+    integration_id: int,
     external_product_id: str | None,
     product_name: str,
-    uom: str,
 ) -> Product | None:
     if external_product_id:
+        mapping = db.scalar(
+            select(ProductMapping).where(
+                ProductMapping.company_id == company_id,
+                ProductMapping.integration_id == integration_id,
+                ProductMapping.external_product_id == external_product_id,
+                ProductMapping.active.is_(True),
+            )
+        )
+        if mapping is not None:
+            return mapping.product
+
         product = db.scalar(
-            select(Product)
-            .where(
+            select(Product).where(
                 Product.company_id == company_id,
                 Product.sku == external_product_id,
             )
@@ -28,17 +40,41 @@ def resolve_product(
         if product is not None:
             return product
 
-    product = db.scalar(
+    return db.scalar(
         select(Product).where(
             Product.company_id == company_id,
             Product.name.ilike(product_name),
         )
     )
 
-    if product is not None:
-        return product
 
-    return None
+def normalize_quantity(
+    db: Session,
+    company_id: int,
+    product: Product,
+    quantity: Decimal,
+    from_uom: str,
+) -> tuple[Decimal, str]:
+    source_uom = from_uom.upper()
+    target_uom = product.base_uom.upper()
+
+    if source_uom == target_uom:
+        return quantity, target_uom
+
+    conversion = db.scalar(
+        select(ProductUOMConversion).where(
+            ProductUOMConversion.company_id == company_id,
+            ProductUOMConversion.product_id == product.id,
+            ProductUOMConversion.from_uom == source_uom,
+            ProductUOMConversion.to_uom == target_uom,
+            ProductUOMConversion.active.is_(True),
+        )
+    )
+
+    if conversion is None:
+        return quantity, source_uom
+
+    return quantity * conversion.factor, target_uom
 
 
 def import_sale(
@@ -74,18 +110,30 @@ def import_sale(
         product = resolve_product(
             db,
             integration.company_id,
+            integration.id,
             line.external_product_id,
             line.product_name,
-            line.uom,
         )
+
+        quantity = line.quantity
+        uom = line.uom.upper()
+
+        if product is not None:
+            quantity, uom = normalize_quantity(
+                db,
+                integration.company_id,
+                product,
+                line.quantity,
+                line.uom,
+            )
 
         sale.lines.append(
             SaleLine(
                 product_id=product.id if product else None,
                 external_product_id=line.external_product_id,
                 product_name=line.product_name,
-                quantity=line.quantity,
-                uom=line.uom.upper(),
+                quantity=quantity,
+                uom=uom,
                 unit_price=line.unit_price,
                 net_value=line.net_value,
                 tax_value=line.tax_value,
