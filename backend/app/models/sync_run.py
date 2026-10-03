@@ -28,6 +28,7 @@ class SyncRun(TimestampMixin, Base):
     imported: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     skipped_duplicates: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_message: Mapped[str | None] = mapped_column(Text)
+    trigger: Mapped[str] = mapped_column(String(20), nullable=False, default="manual", server_default="manual")
 
     company: Mapped["Company"] = relationship()
     integration: Mapped["POSIntegration"] = relationship()

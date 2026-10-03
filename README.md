@@ -63,11 +63,19 @@ Existing POS
 - `/api/costs`
 - `/api/dashboard`
 
+## Background synchronisation
+
+Set `sync_interval_minutes` (5–1440) on an integration to have the `worker` service sync it
+automatically (`python -m app.worker`). Failures retry with exponential backoff (1, 2, 4 … 60 min);
+after 5 consecutive failures the schedule pauses and `sync_paused_reason` explains why. Updating
+`sync_interval_minutes` resumes it. Runs stuck in `running` for 15 minutes are marked failed.
+Several workers can run at once.
+
 ## Database migrations
 
 The migration chain currently reaches:
 
-`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013 → 0014 → 0015 → 0016 → 0017`
+`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013 → 0014 → 0015 → 0016 → 0017 → 0018`
 
 ## Run locally
 

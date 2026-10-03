@@ -45,6 +45,21 @@ services:
     ports:
       - "8000:8000"
 
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-horeca}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-horeca}
+      APP_ENV: ${APP_ENV:-development}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY}
+      WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-30}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
   frontend:
     build: ./frontend
     restart: unless-stopped

@@ -22,7 +22,7 @@ from app.schemas.pos_integration import (
 )
 from app.schemas.sync_runs import SyncRunRead
 from app.services.pos_connectors import get_connector
-from app.services.sales_ingestion import import_sale
+from app.services.sync import run_sync
 
 router = APIRouter(prefix="/integrations/pos", tags=["pos-integrations"])
 
@@ -105,6 +105,8 @@ def create_integration(
         external_account_id=payload.external_account_id,
         credentials_ref=payload.credentials_ref,
         config=payload.config,
+        sync_interval_minutes=payload.sync_interval_minutes,
+        next_sync_at=datetime.now(timezone.utc) if payload.sync_interval_minutes else None,
     )
 
     db.add(integration)
@@ -128,8 +130,15 @@ def update_integration(
     if integration is None or integration.company_id != current_user.company_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="POS integration not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    values = payload.model_dump(exclude_unset=True)
+    for field, value in values.items():
         setattr(integration, field, value)
+
+    if "sync_interval_minutes" in values:
+        # (Re)configuring the schedule resumes a paused integration.
+        integration.consecutive_failures = 0
+        integration.sync_paused_reason = None
+        integration.next_sync_at = datetime.now(timezone.utc) if values["sync_interval_minutes"] else None
 
     db.commit()
     db.refresh(integration)
@@ -172,59 +181,14 @@ def sync_integration(
     if not integration.active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="POS integration is inactive")
 
-    sync_run = SyncRun(
-        company_id=integration.company_id,
-        integration_id=integration.id,
-        started_at=datetime.now(timezone.utc),
-        status="running",
-    )
-    db.add(sync_run)
-    db.commit()
-    db.refresh(sync_run)
+    outcome = run_sync(db, integration, trigger="manual")
 
-    try:
-        connector = get_connector(integration.provider)
-        pull_result = connector.pull_sales(integration, integration.last_sync_cursor)
-        sales = pull_result.sales
-        sync_run.fetched = len(sales)
+    if outcome.error is not None:
+        if isinstance(outcome.error, ValueError):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(outcome.error))
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"POS sync failed: {outcome.error}")
 
-        for sale in sales:
-            if import_sale(db, integration, sale):
-                sync_run.imported += 1
-            else:
-                sync_run.skipped_duplicates += 1
-
-        integration.last_sync_cursor = pull_result.next_cursor
-        integration.last_synced_at = datetime.now(timezone.utc)
-        integration.status = "connected"
-        sync_run.status = "success"
-        sync_run.finished_at = datetime.now(timezone.utc)
-        db.commit()
-
-    except ValueError as exc:
-        db.rollback()
-        sync_run = db.get(SyncRun, sync_run.id)
-        if sync_run is not None:
-            sync_run.status = "error"
-            sync_run.finished_at = datetime.now(timezone.utc)
-            sync_run.error_message = str(exc)
-            db.commit()
-        integration.status = "error"
-        db.commit()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-
-    except Exception as exc:
-        db.rollback()
-        sync_run = db.get(SyncRun, sync_run.id)
-        if sync_run is not None:
-            sync_run.status = "error"
-            sync_run.finished_at = datetime.now(timezone.utc)
-            sync_run.error_message = str(exc)
-            db.commit()
-        integration.status = "error"
-        db.commit()
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"POS sync failed: {exc}")
-
+    sync_run = outcome.sync_run
     return POSSyncResult(
         integration_id=integration.id,
         provider=integration.provider,

@@ -16,6 +16,7 @@ class POSIntegrationCreate(BaseModel):
     external_account_id: str | None = Field(default=None, max_length=200)
     credentials_ref: str | None = Field(default=None, max_length=500)
     config: dict | None = None
+    sync_interval_minutes: int | None = Field(default=None, ge=5, le=1440)
 
 
 class POSIntegrationUpdate(BaseModel):
@@ -27,6 +28,7 @@ class POSIntegrationUpdate(BaseModel):
     config: dict | None = None
     active: bool | None = None
     status: IntegrationStatus | None = None
+    sync_interval_minutes: int | None = Field(default=None, ge=5, le=1440)
 
 
 class WebhookTokenResponse(BaseModel):
@@ -48,6 +50,10 @@ class POSIntegrationRead(BaseModel):
     credentials_ref: str | None
     config: dict | None
     webhook_configured: bool = False
+    sync_interval_minutes: int | None = None
+    next_sync_at: datetime | None = None
+    consecutive_failures: int = 0
+    sync_paused_reason: str | None = None
     last_sync_cursor: str | None
     last_synced_at: datetime | None
     active: bool

@@ -13,5 +13,6 @@ class SyncRunRead(BaseModel):
     imported: int
     skipped_duplicates: int
     error_message: str | None
+    trigger: str = "manual"
 
     model_config = ConfigDict(from_attributes=True)
