@@ -52,10 +52,12 @@ function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authMode, setAuthMode] = useState<"login" | "bootstrap">("login");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [registerCompanyId, setRegisterCompanyId] = useState("");
+  const [registerCompanyName, setRegisterCompanyName] = useState("");
+  const [registerTaxIdentifier, setRegisterTaxIdentifier] = useState("");
   const [registerFirstName, setRegisterFirstName] = useState("");
   const [registerLastName, setRegisterLastName] = useState("");
 
@@ -108,10 +110,12 @@ function App() {
         setToken(data.access_token);
         setCurrentUser(data.user);
       } else {
-        const response = await apiFetch("/auth/register", {
+        const response = await apiFetch("/auth/bootstrap", {
           method: "POST",
           body: JSON.stringify({
-            company_id: Number(registerCompanyId),
+            company_name: registerCompanyName,
+            tax_identifier: registerTaxIdentifier || null,
+            currency: "RON",
             email: authEmail,
             password: authPassword,
             first_name: registerFirstName,
@@ -122,8 +126,10 @@ function App() {
 
         if (!response.ok) throw new Error(await readError(response, "Registration failed."));
 
-        setAuthMode("login");
-        setError("Owner account created. You can now log in.");
+        const data: AuthResponse = await response.json();
+        localStorage.setItem(TOKEN_KEY, data.access_token);
+        setToken(data.access_token);
+        setCurrentUser(data.user);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed.");
@@ -356,18 +362,25 @@ function App() {
       <main className="auth-page">
         <section className="card auth-card">
           <p className="eyebrow">HoReCa Management Platform</p>
-          <h1>{authMode === "login" ? "Sign in" : "Create company owner"}</h1>
+          <h1>{authMode === "login" ? "Sign in" : "Create your HoReCa company"}</h1>
 
           <form onSubmit={handleAuth} className="auth-form">
-            {authMode === "register" && (
+            {authMode === "bootstrap" && (
               <>
                 <label>
-                  Company ID
+                  Company name
                   <input
-                    value={registerCompanyId}
-                    onChange={(event) => setRegisterCompanyId(event.target.value)}
+                    value={registerCompanyName}
+                    onChange={(event) => setRegisterCompanyName(event.target.value)}
                     required
-                    inputMode="numeric"
+                  />
+                </label>
+
+                <label>
+                  Tax identifier
+                  <input
+                    value={registerTaxIdentifier}
+                    onChange={(event) => setRegisterTaxIdentifier(event.target.value)}
                   />
                 </label>
 
@@ -456,29 +469,6 @@ function App() {
       </header>
 
       {error && <p className="error">{error}</p>}
-
-      <section className="card">
-        <h2>Create company</h2>
-        <form onSubmit={handleCompanySubmit} className="form">
-          <label>
-            Company name
-            <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} required />
-          </label>
-          <label>
-            Tax identifier
-            <input value={taxIdentifier} onChange={(event) => setTaxIdentifier(event.target.value)} />
-          </label>
-          <label>
-            Currency
-            <select value={currency} onChange={(event) => setCurrency(event.target.value)}>
-              <option>RON</option>
-              <option>EUR</option>
-              <option>USD</option>
-            </select>
-          </label>
-          <button type="submit" disabled={saving}>Create company</button>
-        </form>
-      </section>
 
       <section className="card">
         <div className="section-heading">
