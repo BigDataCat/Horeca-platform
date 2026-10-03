@@ -120,7 +120,7 @@ VITE_API_URL=http://localhost:8000/api
 
 ## Production notes
 
-- Set a strong `JWT_SECRET_KEY`.
+- Set `APP_ENV=production` and a strong, unique `JWT_SECRET_KEY` (at least 32 characters); the API refuses to start in production with the default or a short secret.
 - Set `CORS_ORIGINS` to the deployed frontend origin(s).
 - Store POS webhook tokens in a proper secret manager before production.
 - Run Alembic migrations before starting the API.
@@ -143,4 +143,4 @@ export TEST_DATABASE_URL=postgresql+psycopg://horeca:change-me@localhost:5432/ho
 pytest
 ```
 
-Warning: the test database is dropped and recreated on every run. Never point `TEST_DATABASE_URL` at real data.
+Warning: all tables in the test database are dropped and recreated on every run. Never point `TEST_DATABASE_URL` at real data.
