@@ -1,4 +1,5 @@
 from app.models.inventory import ProductStock, StockMovement
+from app.models.recipe import Recipe, RecipeLine
 from app.models.company import Company
 from app.models.location import Location
 from app.models.pos_integration import POSIntegration
@@ -10,6 +11,8 @@ from app.models.sync_run import SyncRun
 from app.models.user import User
 
 __all__ = [
+    "Recipe",
+    "RecipeLine",
     "ProductStock",
     "StockMovement",
     "Company",
