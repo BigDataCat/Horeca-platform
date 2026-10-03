@@ -1,2 +1,111 @@
-body { margin: 0; font-family: Arial, sans-serif; background: #f7f7f7; color: #222; }
-main { max-width: 960px; margin: 80px auto; padding: 24px; }
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #1f2937;
+  background: #f3f4f6;
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; }
+
+button, input, select { font: inherit; }
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+header { margin-bottom: 28px; }
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+h1, h2 { margin-top: 0; }
+
+.subtitle { color: #6b7280; }
+
+.card {
+  margin-bottom: 24px;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+
+.form {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 120px auto;
+  gap: 16px;
+  align-items: end;
+}
+
+label {
+  display: grid;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+input, select {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #fff;
+}
+
+button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 7px;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled { opacity: .6; cursor: not-allowed; }
+
+.secondary { background: #e5e7eb; color: #111827; }
+
+.danger { background: #b91c1c; }
+
+.error {
+  padding: 12px 16px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.table-wrapper { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+th { font-size: 13px; color: #6b7280; }
+
+@media (max-width: 800px) {
+  .form { grid-template-columns: 1fr; }
+}
