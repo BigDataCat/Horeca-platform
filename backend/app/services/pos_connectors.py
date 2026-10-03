@@ -90,10 +90,39 @@ class DemoPOSConnector:
         ]
 
 
+@dataclass(frozen=True)
+class POSProviderInfo:
+    provider: str
+    display_name: str
+    supported_connection_types: tuple[str, ...]
+    capabilities: tuple[str, ...]
+
+
+PROVIDER_CATALOG: tuple[POSProviderInfo, ...] = (
+    POSProviderInfo(
+        provider="demo",
+        display_name="Demo POS",
+        supported_connection_types=("api",),
+        capabilities=("sales_pull", "product_mapping", "uom_normalization", "idempotent_sync"),
+    ),
+    POSProviderInfo(
+        provider="mock",
+        display_name="Mock",
+        supported_connection_types=("api", "webhook", "file"),
+        capabilities=("connection_test",),
+    ),
+)
+
+
+
 CONNECTORS: dict[str, POSConnector] = {
     "mock": MockPOSConnector(),
     "demo": DemoPOSConnector(),
 }
+
+
+def list_provider_catalog() -> list[POSProviderInfo]:
+    return list(PROVIDER_CATALOG)
 
 
 def register_connector(provider: str, connector: POSConnector) -> None:
