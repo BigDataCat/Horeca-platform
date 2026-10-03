@@ -103,6 +103,16 @@ class DemoPOSConnector:
         )
 
 
+class CSVFileConnector:
+    """Sales arrive as uploaded CSV files (POST /api/sales/import-csv); nothing is pulled."""
+
+    def test_connection(self, integration: POSIntegration) -> ConnectorResult:
+        return ConnectorResult(success=True, message="CSV import needs no connection. Upload a file to import sales.")
+
+    def pull_sales(self, integration: POSIntegration, cursor: str | None = None) -> SalesPullResult:
+        return SalesPullResult(sales=[], next_cursor=cursor)
+
+
 @dataclass(frozen=True)
 class POSProviderInfo:
     provider: str
@@ -119,6 +129,12 @@ PROVIDER_CATALOG: tuple[POSProviderInfo, ...] = (
         capabilities=("sales_pull", "product_mapping", "uom_normalization", "idempotent_sync"),
     ),
     POSProviderInfo(
+        provider="csv",
+        display_name="CSV file import",
+        supported_connection_types=("file",),
+        capabilities=("csv_import", "product_mapping", "uom_normalization", "idempotent_sync"),
+    ),
+    POSProviderInfo(
         provider="mock",
         display_name="Mock",
         supported_connection_types=("api", "webhook", "file"),
@@ -131,6 +147,7 @@ PROVIDER_CATALOG: tuple[POSProviderInfo, ...] = (
 CONNECTORS: dict[str, POSConnector] = {
     "mock": MockPOSConnector(),
     "demo": DemoPOSConnector(),
+    "csv": CSVFileConnector(),
 }
 
 

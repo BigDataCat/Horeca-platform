@@ -67,7 +67,7 @@ Existing POS
 
 The migration chain currently reaches:
 
-`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013 → 0014 → 0015 → 0016`
+`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013 → 0014 → 0015 → 0016 → 0017`
 
 ## Run locally
 
@@ -144,3 +144,16 @@ pytest
 ```
 
 Warning: all tables in the test database are dropped and recreated on every run. Never point `TEST_DATABASE_URL` at real data.
+
+## CSV sales import (any POS)
+
+For POS systems without an API, create an integration with provider `csv` and upload an export:
+
+```bash
+curl -X POST "http://localhost:8000/api/sales/import-csv?integration_id=1" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: text/csv" --data-binary @sales.csv
+```
+
+One row per sale line. Required columns: `sale_id`, `occurred_at`, `product_name`, `quantity`, `unit_price`.
+Optional: `currency`, `external_product_id`, `uom`, `net_value`, `tax_value`. `,` and `;` delimiters are
+detected (decimal comma allowed with `;`). The file is all-or-nothing and re-uploading is idempotent.

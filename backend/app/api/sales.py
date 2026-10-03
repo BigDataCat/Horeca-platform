@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -6,6 +6,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.pos_integration import POSIntegration
 from app.models.sale import Sale, SaleLine
+from app.models.company import Company
 from app.models.user import User
 from app.schemas.sales import (
     SaleStatusChange,
@@ -14,6 +15,7 @@ from app.schemas.sales import (
     SalesImportResult,
     UnmatchedProductRead,
 )
+from app.services.csv_sales import CSVImportError, parse_csv_sales
 from app.services.sales_ingestion import change_sale_status, import_sale
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -127,6 +129,55 @@ def import_sales(
             else:
                 skipped_duplicates += 1
 
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    return SalesImportResult(imported=imported, skipped_duplicates=skipped_duplicates)
+
+
+MAX_CSV_BYTES = 5 * 1024 * 1024
+
+
+@router.post("/import-csv", response_model=SalesImportResult)
+async def import_sales_csv(
+    request: Request,
+    integration_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SalesImportResult:
+    """Import sales from a CSV export (raw ``text/csv`` request body). All-or-nothing."""
+    require_manager(current_user)
+
+    integration = db.get(POSIntegration, integration_id)
+    if integration is None or integration.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="POS integration not found")
+    if not integration.active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="POS integration is inactive")
+
+    body = await request.body()
+    if len(body) > MAX_CSV_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="CSV file is too large (5 MB maximum)")
+    try:
+        text = body.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV must be UTF-8 encoded")
+
+    company = db.get(Company, current_user.company_id)
+    try:
+        sales = parse_csv_sales(text, company.currency if company else "RON")
+    except CSVImportError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors)
+
+    imported = 0
+    skipped_duplicates = 0
+    try:
+        for canonical_sale in sales:
+            if import_sale(db, integration, canonical_sale):
+                imported += 1
+            else:
+                skipped_duplicates += 1
         db.commit()
     except ValueError as exc:
         db.rollback()
