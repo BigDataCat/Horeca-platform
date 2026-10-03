@@ -77,6 +77,13 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 
 .danger { background: #b91c1c; }
 
+.form-actions,
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .error {
   padding: 12px 16px;
   border: 1px solid #fecaca;

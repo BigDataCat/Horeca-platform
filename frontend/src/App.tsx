@@ -15,6 +15,7 @@ function App() {
   const [name, setName] = useState("");
   const [taxIdentifier, setTaxIdentifier] = useState("");
   const [currency, setCurrency] = useState("RON");
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -38,33 +39,50 @@ function App() {
     void loadCompanies();
   }, []);
 
+  function resetForm() {
+    setName("");
+    setTaxIdentifier("");
+    setCurrency("RON");
+    setEditingId(null);
+  }
+
+  function startEdit(company: Company) {
+    setEditingId(company.id);
+    setName(company.name);
+    setTaxIdentifier(company.tax_identifier ?? "");
+    setCurrency(company.currency);
+    setError("");
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/companies`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          tax_identifier: taxIdentifier || null,
-          currency,
-        }),
-      });
+      const isEditing = editingId !== null;
+      const response = await fetch(
+        isEditing ? `${API_URL}/companies/${editingId}` : `${API_URL}/companies`,
+        {
+          method: isEditing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            tax_identifier: taxIdentifier || null,
+            currency,
+          }),
+        },
+      );
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        throw new Error(body?.detail ?? "Could not create company.");
+        throw new Error(body?.detail ?? "Could not save company.");
       }
 
-      setName("");
-      setTaxIdentifier("");
-      setCurrency("RON");
+      resetForm();
       await loadCompanies();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create company.");
+      setError(err instanceof Error ? err.message : "Could not save company.");
     } finally {
       setSaving(false);
     }
@@ -76,6 +94,7 @@ function App() {
     try {
       const response = await fetch(`${API_URL}/companies/${id}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Could not deactivate company.");
+      if (editingId === id) resetForm();
       await loadCompanies();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not deactivate company.");
@@ -91,7 +110,7 @@ function App() {
       </header>
 
       <section className="card">
-        <h2>Create company</h2>
+        <h2>{editingId === null ? "Create company" : "Edit company"}</h2>
         <form onSubmit={handleSubmit} className="form">
           <label>
             Company name
@@ -112,9 +131,16 @@ function App() {
             </select>
           </label>
 
-          <button type="submit" disabled={saving}>
-            {saving ? "Saving..." : "Create company"}
-          </button>
+          <div className="form-actions">
+            <button type="submit" disabled={saving}>
+              {saving ? "Saving..." : editingId === null ? "Create company" : "Save changes"}
+            </button>
+            {editingId !== null && (
+              <button type="button" className="secondary" onClick={resetForm}>
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
       </section>
 
@@ -151,15 +177,20 @@ function App() {
                     <td>{company.tax_identifier ?? "—"}</td>
                     <td>{company.currency}</td>
                     <td>{company.active ? "Active" : "Inactive"}</td>
-                    <td>
+                    <td className="actions">
                       {company.active && (
-                        <button
-                          type="button"
-                          className="danger"
-                          onClick={() => void deactivateCompany(company.id)}
-                        >
-                          Deactivate
-                        </button>
+                        <>
+                          <button type="button" className="secondary" onClick={() => startEdit(company)}>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="danger"
+                            onClick={() => void deactivateCompany(company.id)}
+                          >
+                            Deactivate
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
