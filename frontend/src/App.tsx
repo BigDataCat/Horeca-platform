@@ -938,7 +938,7 @@ function App() {
         <div className="section-heading"><div><h2>POS Product Mapping</h2><p className="subtitle">Map an external POS product to the canonical product.</p></div></div>
         {(currentUser.role === "owner" || currentUser.role === "manager") && (
           <form onSubmit={createMapping} className="form user-form">
-            <label>Integration ID<input value={mappingIntegrationId} onChange={(e) => setMappingIntegrationId(e.target.value)} required type="number" /></label>
+            <label>POS Integration<select value={mappingIntegrationId} onChange={(e) => setMappingIntegrationId(e.target.value)} required><option value="">Select</option>{integrations.filter((i) => i.active).map((i) => <option key={i.id} value={i.id}>{i.name} · {i.provider} · {locations.find((l) => l.id === i.location_id)?.name ?? i.location_id}</option>)}</select></label>
             <label>POS Product ID<input value={mappingExternalId} onChange={(e) => setMappingExternalId(e.target.value)} required /></label>
             <label>Platform Product<select value={mappingProductId} onChange={(e) => setMappingProductId(e.target.value)} required><option value="">Select</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
             <button type="submit">Create mapping</button>
