@@ -67,6 +67,14 @@ function App() {
   const [products, setProducts] = useState<{ id: number; name: string; sku: string | null; base_uom: string; active: boolean }[]>([]);
   const [mappings, setMappings] = useState<{ id: number; integration_id: number; external_product_id: string; external_product_name: string | null; product_id: number; match_method: string }[]>([]);
   const [uomConversions, setUomConversions] = useState<{ id: number; product_id: number; from_uom: string; to_uom: string; factor: number }[]>([]);
+  const [unmatchedProducts, setUnmatchedProducts] = useState<{
+    integration_id: number;
+    external_product_id: string;
+    product_name: string;
+    uom: string;
+    occurrences: number;
+    total_quantity: number;
+  }[]>([]);
   const [newProductName, setNewProductName] = useState("");
   const [newProductSku, setNewProductSku] = useState("");
   const [newProductUom, setNewProductUom] = useState("EA");
@@ -227,6 +235,13 @@ function App() {
     setUomConversions(await response.json());
   }
 
+  async function loadUnmatchedProducts() {
+    if (!token) return;
+    const response = await apiFetch("/sales/unmatched-products", {}, token);
+    if (!response.ok) throw new Error(await readError(response, "Could not load unmatched POS products."));
+    setUnmatchedProducts(await response.json());
+  }
+
   async function createProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
@@ -291,6 +306,7 @@ function App() {
       void loadProducts();
       void loadMappings();
       void loadUomConversions();
+      void loadUnmatchedProducts();
     }
   }, [token]);
 
@@ -753,6 +769,54 @@ function App() {
         <div className="table-wrapper"><table><thead><tr><th>Name</th><th>SKU</th><th>Base UOM</th></tr></thead>
           <tbody>{products.map((p) => <tr key={p.id}><td>{p.name}</td><td>{p.sku ?? "—"}</td><td>{p.base_uom}</td></tr>)}</tbody>
         </table></div>
+      </section>
+
+      <section className="card">
+        <div className="section-heading">
+          <div>
+            <h2>Unmatched POS Products</h2>
+            <p className="subtitle">Products received from POS integrations that could not be linked to the platform product master.</p>
+          </div>
+          <button type="button" className="secondary" onClick={() => void loadUnmatchedProducts()}>Refresh</button>
+        </div>
+        {unmatchedProducts.length === 0 ? (
+          <p>No unmatched POS products.</p>
+        ) : (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr><th>POS Product</th><th>Integration</th><th>UOM</th><th>Occurrences</th><th>Total Qty</th><th /></tr>
+              </thead>
+              <tbody>
+                {unmatchedProducts.map((item) => (
+                  <tr key={item.integration_id + ":" + item.external_product_id}>
+                    <td>{item.product_name} ({item.external_product_id})</td>
+                    <td>{item.integration_id}</td>
+                    <td>{item.uom}</td>
+                    <td>{item.occurrences}</td>
+                    <td>{item.total_quantity}</td>
+                    <td>
+                      {(currentUser.role === "owner" || currentUser.role === "manager") && (
+                        <button
+                          type="button"
+                          className="secondary"
+                          onClick={() => {
+                            setMappingIntegrationId(String(item.integration_id));
+                            setMappingExternalId(item.external_product_id);
+                            setError("");
+                            window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+                          }}
+                        >
+                          Prepare mapping
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="card">
