@@ -18,21 +18,6 @@ type Location = {
   active: boolean;
 };
 
-type POSIntegration = {
-  id: number;
-  company_id: number;
-  location_id: number;
-  provider: string;
-  name: string;
-  connection_type: "api" | "webhook" | "file";
-  status: "inactive" | "connected" | "error";
-  base_url: string | null;
-  external_account_id: string | null;
-  credentials_ref: string | null;
-  config: Record<string, unknown> | null;
-  active: boolean;
-};
-
 type User = {
   id: number;
   company_id: number;
@@ -79,11 +64,6 @@ function App() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [integrations, setIntegrations] = useState<POSIntegration[]>([]);
-  const [integrationName, setIntegrationName] = useState("");
-  const [integrationProvider, setIntegrationProvider] = useState("mock");
-  const [integrationLocationId, setIntegrationLocationId] = useState<number | null>(null);
-  const [integrationType, setIntegrationType] = useState<POSIntegration["connection_type"]>("api");
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
 
   const [companyName, setCompanyName] = useState("");
@@ -213,67 +193,6 @@ function App() {
     }
   }
 
-  async function loadIntegrations() {
-    if (!token) return;
-    try {
-      const response = await apiFetch("/integrations/pos", {}, token);
-      if (!response.ok) throw new Error(await readError(response, "Could not load POS integrations."));
-      setIntegrations(await response.json());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load POS integrations.");
-    }
-  }
-
-  async function createIntegration(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token || integrationLocationId === null) {
-      setError("Select a location before creating a POS integration.");
-      return;
-    }
-    setSaving(true);
-    setError("");
-    try {
-      const response = await apiFetch("/integrations/pos", {
-        method: "POST",
-        body: JSON.stringify({
-          location_id: integrationLocationId,
-          provider: integrationProvider,
-          name: integrationName,
-          connection_type: integrationType,
-        }),
-      }, token);
-      if (!response.ok) throw new Error(await readError(response, "Could not create POS integration."));
-      setIntegrationName("");
-      setIntegrationProvider("mock");
-      setIntegrationType("api");
-      await loadIntegrations();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create POS integration.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function testIntegration(id: number) {
-    if (!token) return;
-    const response = await apiFetch(`/integrations/pos/${id}/test`, { method: "POST" }, token);
-    if (!response.ok) {
-      setError(await readError(response, "POS connection test failed."));
-      return;
-    }
-    await loadIntegrations();
-  }
-
-  async function deactivateIntegration(id: number) {
-    if (!token) return;
-    const response = await apiFetch(`/integrations/pos/${id}`, { method: "DELETE" }, token);
-    if (!response.ok) {
-      setError(await readError(response, "Could not deactivate POS integration."));
-      return;
-    }
-    await loadIntegrations();
-  }
-
   async function loadUsers() {
     if (!token) return;
 
@@ -291,7 +210,6 @@ function App() {
       void loadMe(token);
       void loadCompanies(token);
       void loadUsers();
-      void loadIntegrations();
     }
   }, [token]);
 
@@ -675,74 +593,6 @@ function App() {
             )}
           </>
         )}
-      </section>
-
-      <section className="card">
-        <div className="section-heading">
-          <div>
-            <h2>POS Integrations</h2>
-            <p className="subtitle">Connect this platform to an existing POS system.</p>
-          </div>
-          <button type="button" className="secondary" onClick={() => void loadIntegrations()}>Refresh</button>
-        </div>
-
-        {(currentUser.role === "owner" || currentUser.role === "manager") && (
-          <form onSubmit={createIntegration} className="form integration-form">
-            <label>
-              Location
-              <select value={integrationLocationId ?? ""} onChange={(event) => setIntegrationLocationId(Number(event.target.value))} required>
-                <option value="" disabled>Select location</option>
-                {locations.filter((location) => location.active).map((location) => (
-                  <option key={location.id} value={location.id}>{location.name}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Integration name
-              <input value={integrationName} onChange={(event) => setIntegrationName(event.target.value)} required placeholder="Main POS" />
-            </label>
-            <label>
-              Provider
-              <input value={integrationProvider} onChange={(event) => setIntegrationProvider(event.target.value)} required placeholder="mock" />
-            </label>
-            <label>
-              Type
-              <select value={integrationType} onChange={(event) => setIntegrationType(event.target.value as POSIntegration["connection_type"])}>
-                <option value="api">API</option>
-                <option value="webhook">Webhook</option>
-                <option value="file">File</option>
-              </select>
-            </label>
-            <button type="submit" disabled={saving}>Add integration</button>
-          </form>
-        )}
-
-        <div className="table-wrapper">
-          <table>
-            <thead>
-              <tr><th>Name</th><th>Provider</th><th>Location</th><th>Type</th><th>Status</th><th /></tr>
-            </thead>
-            <tbody>
-              {integrations.map((integration) => (
-                <tr key={integration.id}>
-                  <td>{integration.name}</td>
-                  <td>{integration.provider}</td>
-                  <td>{locations.find((location) => location.id === integration.location_id)?.name ?? integration.location_id}</td>
-                  <td>{integration.connection_type}</td>
-                  <td>{integration.status}</td>
-                  <td className="actions">
-                    {integration.active && (
-                      <>
-                        <button type="button" className="secondary" onClick={() => void testIntegration(integration.id)}>Test</button>
-                        <button type="button" className="danger" onClick={() => void deactivateIntegration(integration.id)}>Deactivate</button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </section>
 
       <section className="card">
