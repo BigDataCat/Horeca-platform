@@ -1,116 +1,56 @@
-# Roadmap
+# Roadmap and status
 
-Baseline: 3 October 2026. Derived from the Soft POS Complete Project Blueprint, extended with gaps identified after review.
+Baseline: 3 October 2026 (Soft POS blueprint). Updated after the engineering push that followed it.
+Legend: ✅ done and tested · 🟡 partly done · ⛔ not done · 🔒 blocked on something outside the code.
 
-Items marked **(new)** are additions to the original blueprint.
+## Summary
+The platform is feature-complete for a **pilot using CSV or demo data**. What stands between it and a
+real production launch is mostly outside the codebase: a pilot POS account (for the first vendor
+connector), a rehearsal of the deployment on real infrastructure, legal documents, and billing.
 
-## Already implemented
+## Status by blueprint area
 
-Multi-tenant companies/locations, JWT auth and roles, products, POS integrations and provider catalog, connector abstraction with demo/mock connectors, incremental sync cursor and sync history, idempotent sales import, product mapping, UOM conversions, unmatched products, webhooks with event idempotency, inventory and stock movements, recipes with automatic consumption, product cost history, recipe costing, operations and inventory dashboards, health check, env-based CORS, Dockerfiles, Nginx API proxy, full Docker Compose stack, `.env.example`.
+| Area | Status | Notes |
+|---|---|---|
+| Automated tests | ✅ | ~200 backend tests on PostgreSQL (auth, roles, tenant isolation, ingestion, UOM, recipes, inventory, costing, webhooks, sync, CSV, audit, plans, privacy, schema drift) + browser smoke test (`e2e/`). |
+| Reproducible build & CI | ✅ | Pinned frontend deps + lockfile, GitHub Actions (backend tests, frontend build). The workflow was added but has not yet run on GitHub. |
+| Security hardening | 🟡 | ✅ production secret check, hashed webhook tokens, login rate limit, token invalidation, plan/role gaps fixed, audit log, request ids, security headers. ⛔ shared rate-limit store, secret-manager integration (needs the first real connector), dependency/vulnerability scanning in CI. |
+| First real POS connector | 🔒 | Needs a pilot POS and sandbox credentials. `docs/CONNECTORS.md` defines the contract and checklist; CSV import covers any POS that exports files. |
+| Background sync | ✅ | Worker, schedules, backoff, auto-pause, stale-run cleanup, SKIP LOCKED claiming. |
+| Webhook resilience | ✅ | Persisted payloads, failed-event list, replay, redelivery retry, hashed tokens, out-of-order cancel events. |
+| Cancellations / returns | ✅ | Full-sale cancel/refund with exact stock reversal (API + webhook events). Partial refunds ⛔. |
+| User lifecycle | 🟡 | ✅ change password, admin reset, logout-everywhere, immediate role/deactivation effect. ⛔ e-mail based reset/invites (no e-mail sending yet), refresh tokens. |
+| Inventory operations | ✅ | Suppliers, goods receipts (stock + last-purchase cost), counts, transfers, movements, adjustments with explicit UOM. ⛔ supplier invoices/payments, lot/expiry tracking. |
+| Costing & margins | ✅ | Effective-dated costs, location override, recipe cost, margin / food-cost % report, CSV export. |
+| Recipes | 🟡 | ✅ waste, location override. ⛔ sub-recipes / semi-finished production, modifiers, combo menus. |
+| Operational UI | ✅ | Sales, inventory, recipes & costs, reports, integrations, alerts, settings (subscription, audit log). Legacy overview page kept. ⛔ i18n (English only), charts, mobile-first layouts. |
+| Alerts | 🟡 | ✅ computed alerts in the UI. ⛔ delivery (e-mail/push). |
+| Observability | 🟡 | ✅ health, JSON logs, `/metrics`. ⛔ tracing, dashboards, alert rules (see `docs/OPERATIONS.md`). |
+| Deployment | 🟡 | ✅ prod compose (TLS), migrate-before-start, health checks, non-root image, backup/restore scripts, runbook. ⛔ never executed on a real server (no Docker daemon in the build environment): rehearse on staging. |
+| SaaS | 🟡 | ✅ plans with enforced limits, subscription view, admin support API, company deactivation/deletion. ⛔ payment provider, invoices, self-service plan change, usage-based billing. |
+| Compliance | 🟡 | ✅ tooling for access/erasure, privacy notes (`docs/PRIVACY.md`). ⛔ lawyer-reviewed policy/DPA, audit-log retention job. |
+| Romanian fiscal | ⛔ | VAT is carried from the POS as given. e-Factura, fiscal-register integration and per-location currency/time zone are not implemented. |
+| Multi-POS | ⛔ | By design only after the first connector is stable. |
 
-## Priorities
+## What is needed from people (cannot be done in code)
+1. **Pick the pilot POS and get sandbox/API access** → implement connector (see `docs/CONNECTORS.md`).
+2. **Rehearse a staging deployment**: first deploy, a release with a migration, a backup and a restore.
+3. **Legal**: privacy policy, terms, DPA, sub-processor list; decide retention periods.
+4. **Choose a billing approach** (payment provider or manual invoicing) before charging customers.
+5. **Decide the fiscal scope** for Romania (e-Factura, fiscal registers) with an accountant.
 
-| Priority | Work |
-|----------|------|
-| P0 | Automated tests + CI |
-| P0 | Production security hardening |
-| P0 | First real POS connector |
-| P0 (new) | User lifecycle (invites, password reset/change, deactivation, token refresh, logout) |
-| P0 (new) | Sale cancellations, returns and voids from the POS |
-| P1 | Background sync + retries, webhook replay / dead-letter |
-| P1 (new) | Goods receipts, suppliers, physical stock counts, inter-location transfers |
-| P1 (new) | Automatic ingredient costs (from receipts/invoices), food cost % and margin reports |
-| P1 | Operational UX: mapping, recipes, costs, inventory workflows, filters |
-| P1 | Staging pilot |
-| P2 | Observability, alerts (new: low stock, failed sync, new unmatched products, missing cost) |
-| P2 (new) | Audit log of user actions (cost, stock, recipe, mapping changes) |
-| P2 (new) | Pagination, filters and CSV/Excel export |
-| P2 (new) | Sub-recipes, modifiers and combo/menu items |
-| P2 (new) | Bulk onboarding import (products, recipes, opening stock) from Excel/CSV |
-| P2 | Second/third POS connectors |
-| P3 | Billing, subscriptions, plan limits |
-| P3 (new) | Romanian fiscal/localisation (VAT rates, e-Factura, fiscal registers if required, currency/timezone per location) |
-| P3 (new) | Frontend i18n (RO/EN) |
+## Suggested next engineering work (in order)
+1. Run CI on GitHub and fix anything environment-specific; add dependency/vulnerability scanning.
+2. First vendor connector once access exists (include status-change reporting for polling connectors).
+3. E-mail sending (password reset, invites, alert delivery) with a provider chosen by the operator.
+4. Sub-recipes / semi-finished products and modifiers, driven by the pilot's actual menu.
+5. Shared rate-limit/metrics store before running multiple backend replicas.
+6. Payment provider integration; i18n (RO/EN); audit-log purge job.
 
-## Phases
-
-### Phase 0 — Baseline and freeze
-- Tag a baseline release; record migration head (`0012`) and versions.
-- Keep Docker Compose as the reproducible dev baseline.
-
-### Phase 1 — Automated quality layer
-- pytest, fixtures (company/user/location/product/integration).
-- Tests: auth and invalid tokens, roles, tenant isolation, mapping, UOM, duplicate sales, sync cursor, recipe selection/fallback, waste, stock adjustments, webhook auth and duplicates, recipe costing, dashboard totals.
-- Frontend build validation.
-- (new) Volume/performance test of ingestion (thousands of transactions) and index review.
-
-### Phase 2 — Reproducible build and CI
-- Pin frontend dependencies, generate `package-lock.json`; backend dependency reproducibility.
-- GitHub Actions: backend tests, frontend typecheck/build, migration validation; fail on any break.
-
-### Phase 3 — Security and production hardening
-- Reject default JWT secret in production; secure secret storage.
-- Separate webhook credentials from integration config.
-- Review token expiry, CORS, constraints/indexes, sync transaction boundaries; deterministic failed `SyncRun` persistence.
-- Structured logs; rate limiting.
-- (new) User lifecycle: invites, password reset/change, deactivation, refresh token, logout.
-
-### Phase 4 — First real POS connector
-- Provider choice by API/access feasibility.
-- Auth, connection test, location/product discovery, historical import, incremental sync, pagination, retry/backoff, webhooks where supported, tax/currency semantics, provider integration tests.
-- (new) Handle cancellations, returns and voids, including reversing stock consumption.
-
-### Phase 5 — Integration operations
-- Background jobs, scheduled sync, job states, retries, failure reasons, manual retry, webhook replay, dead-letter, integration health, sync metrics.
-- (new) Alerts for failed sync and new unmatched products.
-
-### Phase 6 — Complete the user product
-- Connection wizard, mapping workspace, unmatched resolution, recipes and ingredients, cost management, inventory adjustments, movement history, sales detail, filters, charts, error/sync status screens, role-based UI.
-- (new) Goods receipts and suppliers, physical counts with variances, inter-location transfers.
-- (new) Automatic costs from receipts/invoices; food cost % and margin reports.
-- (new) Sub-recipes, modifiers, combos.
-- (new) Pagination, filters, CSV/Excel export; bulk onboarding import.
-- (new) Audit log of user actions; low-stock alerts.
-- (new) i18n (RO/EN).
-
-### Phase 7 — Staging and pilot
-- Isolated staging, production-like PostgreSQL, real secrets, monitoring, backups.
-- Pilot POS, historical import, daily sync; validate stock/recipe/cost outputs; measure failure/recovery; runbooks.
-
-### Phase 8 — Production SaaS
-- Production infra, HTTPS, managed PostgreSQL, tested backup/restore, monitoring, centralised logs, CI/CD with migration step and rollback.
-- Tenant onboarding, billing, usage metering, plan limits, admin/support tools.
-- (new) Romanian fiscal and localisation requirements; privacy/GDPR/retention.
-
-### Phase 9 — Multi-POS expansion
-- Second connector only after the first is operationally stable.
-- Connector SDK/interface documentation (new), connector health and versioning, provider onboarding process.
-
-## Immediate next work package
-
-1. Backend test infrastructure.
-2. Tenant-isolation tests.
-3. Auth/role tests.
-4. Sales import and duplicate tests.
-5. Mapping and UOM tests.
-6. Recipe/inventory/costing tests.
-7. Webhook tests.
-8. Dashboard tests.
-9. Pin frontend dependencies, lockfile.
-10. CI workflow.
-11. Harden sync transaction handling.
-12. Enforce production JWT secret rules.
-13. Select and build the first real POS connector.
-
-## Development rules
-
-- Every business feature has an API test.
-- Every company-scoped endpoint enforces tenant isolation.
-- External POS operations are idempotent where possible.
-- No invented conversions; mappings/UOM must be explicit.
-- Provider-specific behaviour lives in connectors.
-- Core logic is reusable by API, webhooks and background jobs.
-- Schema changes go through Alembic.
-- Production config must not rely on development defaults.
-- No second connector before the first has a stable lifecycle.
-- Prefer measurable end-to-end milestones over isolated features.
+## Development rules (unchanged)
+- Every business feature has an API test; every company-scoped endpoint enforces tenant isolation.
+- External POS operations are idempotent; no invented conversions (UOM and cost gaps stay visible).
+- Provider-specific behaviour lives in connectors; core logic is reusable by API, webhooks and jobs.
+- Schema changes go through Alembic (`alembic check` runs in the test suite).
+- Production configuration never relies on development defaults.
+- No second connector before the first has a stable operational lifecycle.

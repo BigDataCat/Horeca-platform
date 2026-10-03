@@ -25,7 +25,19 @@ Existing POS
                 Dashboard
 ```
 
+## Documentation
+
+- [docs/ROADMAP.md](docs/ROADMAP.md) – status of every area and what is still open
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) – deployment, releases, backups, monitoring, incidents
+- [docs/CONNECTORS.md](docs/CONNECTORS.md) – how to write a POS connector
+- [docs/PRIVACY.md](docs/PRIVACY.md) – data stored, GDPR tooling, retention decisions
+- [e2e/README.md](e2e/README.md) – browser smoke test
+
 ## Implemented modules
+
+- Sale cancellations/refunds with stock reversal, CSV sales import, scheduled background sync with retries
+- Suppliers, goods receipts, stock counts, transfers, margin / food-cost report
+- Audit log, alerts, CSV exports, plans with limits, admin support API, Prometheus metrics
 
 - Multi-tenant companies and locations
 - JWT authentication and role-based access
@@ -157,11 +169,9 @@ VITE_API_URL=http://localhost:8000/api
 - Webhook tokens are generated with `POST /api/integrations/pos/{id}/webhook-token` and stored only as SHA-256 hashes. Provider credentials (`credentials_ref`) should point to a secret manager.
 - Migrations run automatically through the one-shot `migrate` service in `docker-compose.yml`; when deploying elsewhere, run `alembic upgrade head` as a release step before starting the API.
 - Use HTTPS for API and webhook endpoints.
-- Replace demo/mock connectors with provider-specific implementations.
+- Use `deploy/docker-compose.prod.yml` (TLS, no exposed DB, backups) – see [docs/OPERATIONS.md](docs/OPERATIONS.md).
+- Replace demo/mock connectors with a provider-specific implementation ([docs/CONNECTORS.md](docs/CONNECTORS.md)); until then use CSV import.
 
-## Roadmap
-
-See [docs/ROADMAP.md](docs/ROADMAP.md) for remaining work, priorities and phases.
 
 ## Tests
 

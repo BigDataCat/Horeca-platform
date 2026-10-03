@@ -1,0 +1,10 @@
+{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+	# /metrics is not routed publicly; scrape it from inside the network.
+	respond /metrics 404
+	reverse_proxy frontend:80
+}
