@@ -43,8 +43,8 @@ class DemoPOSConnector:
     Deterministic local POS connector used to exercise the complete ingestion flow.
 
     It deliberately returns one mapped-product candidate and one unmatched product.
-    Re-running the sync returns the same external sale IDs, so the import layer
-    demonstrates idempotency by skipping duplicates.
+    The first sync returns sample sales and advances the integration cursor.
+    Subsequent syncs return no new rows until a real POS connector advances the cursor.
     """
 
     def test_connection(self, integration: POSIntegration) -> ConnectorResult:
