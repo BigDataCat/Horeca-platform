@@ -1,13 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.pos_integration import POSIntegration
-from app.models.sale import Sale
+from app.models.sale import Sale, SaleLine
 from app.models.user import User
-from app.schemas.sales import SaleRead, SalesImportRequest, SalesImportResult
+from app.schemas.sales import (
+    SaleRead,
+    SalesImportRequest,
+    SalesImportResult,
+    UnmatchedProductRead,
+)
 from app.services.sales_ingestion import import_sale
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -31,6 +36,48 @@ def list_sales(
             .order_by(Sale.occurred_at.desc())
         ).all()
     )
+
+
+@router.get("/unmatched-products", response_model=list[UnmatchedProductRead])
+def list_unmatched_products(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[UnmatchedProductRead]:
+    rows = db.execute(
+        select(
+            Sale.integration_id,
+            SaleLine.external_product_id,
+            SaleLine.product_name,
+            SaleLine.uom,
+            func.count(SaleLine.id).label("occurrences"),
+            func.sum(SaleLine.quantity).label("total_quantity"),
+        )
+        .join(Sale, Sale.id == SaleLine.sale_id)
+        .where(
+            Sale.company_id == current_user.company_id,
+            SaleLine.product_id.is_(None),
+            SaleLine.external_product_id.is_not(None),
+        )
+        .group_by(
+            Sale.integration_id,
+            SaleLine.external_product_id,
+            SaleLine.product_name,
+            SaleLine.uom,
+        )
+        .order_by(func.count(SaleLine.id).desc(), SaleLine.product_name)
+    ).all()
+
+    return [
+        UnmatchedProductRead(
+            integration_id=row.integration_id,
+            external_product_id=row.external_product_id,
+            product_name=row.product_name,
+            uom=row.uom,
+            occurrences=row.occurrences,
+            total_quantity=row.total_quantity,
+        )
+        for row in rows
+    ]
 
 
 @router.post("/import", response_model=SalesImportResult)
