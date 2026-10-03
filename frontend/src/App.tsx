@@ -64,6 +64,19 @@ function App() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [products, setProducts] = useState<{ id: number; name: string; sku: string | null; base_uom: string; active: boolean }[]>([]);
+  const [mappings, setMappings] = useState<{ id: number; integration_id: number; external_product_id: string; external_product_name: string | null; product_id: number; match_method: string }[]>([]);
+  const [uomConversions, setUomConversions] = useState<{ id: number; product_id: number; from_uom: string; to_uom: string; factor: number }[]>([]);
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductSku, setNewProductSku] = useState("");
+  const [newProductUom, setNewProductUom] = useState("EA");
+  const [mappingIntegrationId, setMappingIntegrationId] = useState("");
+  const [mappingExternalId, setMappingExternalId] = useState("");
+  const [mappingProductId, setMappingProductId] = useState("");
+  const [conversionProductId, setConversionProductId] = useState("");
+  const [conversionFromUom, setConversionFromUom] = useState("");
+  const [conversionToUom, setConversionToUom] = useState("");
+  const [conversionFactor, setConversionFactor] = useState("");
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
 
   const [companyName, setCompanyName] = useState("");
@@ -193,6 +206,71 @@ function App() {
     }
   }
 
+  async function loadProducts() {
+    if (!token) return;
+    const response = await apiFetch("/products", {}, token);
+    if (!response.ok) throw new Error(await readError(response, "Could not load products."));
+    setProducts(await response.json());
+  }
+
+  async function loadMappings() {
+    if (!token) return;
+    const response = await apiFetch("/product-mappings", {}, token);
+    if (!response.ok) throw new Error(await readError(response, "Could not load product mappings."));
+    setMappings(await response.json());
+  }
+
+  async function loadUomConversions() {
+    if (!token) return;
+    const response = await apiFetch("/product-mappings/uom-conversions", {}, token);
+    if (!response.ok) throw new Error(await readError(response, "Could not load UOM conversions."));
+    setUomConversions(await response.json());
+  }
+
+  async function createProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    const response = await apiFetch("/products", {
+      method: "POST",
+      body: JSON.stringify({ name: newProductName, sku: newProductSku || null, base_uom: newProductUom }),
+    }, token);
+    if (!response.ok) { setError(await readError(response, "Could not create product.")); return; }
+    setNewProductName(""); setNewProductSku(""); setNewProductUom("EA");
+    await loadProducts();
+  }
+
+  async function createMapping(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    const response = await apiFetch("/product-mappings", {
+      method: "POST",
+      body: JSON.stringify({
+        integration_id: Number(mappingIntegrationId),
+        external_product_id: mappingExternalId,
+        product_id: Number(mappingProductId),
+      }),
+    }, token);
+    if (!response.ok) { setError(await readError(response, "Could not create product mapping.")); return; }
+    setMappingExternalId(""); await loadMappings();
+  }
+
+  async function createConversion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    const response = await apiFetch("/product-mappings/uom-conversions", {
+      method: "POST",
+      body: JSON.stringify({
+        product_id: Number(conversionProductId),
+        from_uom: conversionFromUom,
+        to_uom: conversionToUom,
+        factor: Number(conversionFactor),
+      }),
+    }, token);
+    if (!response.ok) { setError(await readError(response, "Could not create UOM conversion.")); return; }
+    setConversionFromUom(""); setConversionToUom(""); setConversionFactor("");
+    await loadUomConversions();
+  }
+
   async function loadUsers() {
     if (!token) return;
 
@@ -210,6 +288,9 @@ function App() {
       void loadMe(token);
       void loadCompanies(token);
       void loadUsers();
+      void loadProducts();
+      void loadMappings();
+      void loadUomConversions();
     }
   }, [token]);
 
@@ -438,7 +519,7 @@ function App() {
             type="button"
             className="secondary full-width"
             onClick={() => {
-              setAuthMode(authMode === "login" ? "register" : "login");
+              setAuthMode(authMode === "login" ? "bootstrap" : "login");
               setError("");
             }}
           >
