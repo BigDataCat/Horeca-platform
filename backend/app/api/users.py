@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -150,6 +152,38 @@ def reset_user_password(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Managers cannot reset owner passwords")
 
     user.password_hash = hash_password(payload.new_password)
+    user.token_version += 1
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/{user_id}/anonymize", response_model=UserRead)
+def anonymize_user(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """GDPR erasure: removes the person's identifying data and locks the account.
+
+    Business records they created (audit log entries, receipts, counts) are kept and keep
+    pointing to the now-anonymous user, so history stays consistent without personal data."""
+    if current_user.role != "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner role required")
+
+    user = db.get(User, user_id)
+
+    if user is None or user.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Owners cannot anonymize their own account")
+
+    user.email = f"anonymized-{user.id}@example.com"
+    user.first_name = "Deleted"
+    user.last_name = "User"
+    user.password_hash = hash_password(secrets.token_urlsafe(32))
+    user.active = False
     user.token_version += 1
     db.commit()
     db.refresh(user)

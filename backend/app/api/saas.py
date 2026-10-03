@@ -98,3 +98,17 @@ def admin_update_company(company_id: int, payload: AdminCompanyUpdate, db: Sessi
     db.commit()
     db.refresh(company)
     return _admin_view(db, company)
+
+
+@router.delete("/admin/companies/{company_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
+def admin_delete_company(company_id: int, confirm_name: str, db: Session = Depends(get_db)) -> None:
+    """Permanently delete a company and ALL its data (GDPR erasure / offboarding). Irreversible.
+
+    ``confirm_name`` must equal the company name exactly."""
+    company = db.get(Company, company_id)
+    if company is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+    if confirm_name != company.name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="confirm_name does not match the company name")
+    db.delete(company)
+    db.commit()

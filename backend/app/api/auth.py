@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.rate_limit import SlidingWindowLimiter
 from app.core.security import create_access_token, get_current_user, hash_password, verify_password
+from app.models.audit_log import AuditLog
 from app.models.company import Company
 from app.models.user import User
 from app.services.plans import PLANS
@@ -155,3 +156,34 @@ def logout(
     """Invalidate every token issued to the caller (all devices)."""
     current_user.token_version += 1
     db.commit()
+
+
+@router.get("/me/export")
+def export_my_data(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """GDPR access request: the personal data held about the caller and the actions recorded for them."""
+    actions = db.scalars(
+        select(AuditLog).where(AuditLog.user_id == current_user.id).order_by(AuditLog.id)
+    ).all()
+    return {
+        "profile": {
+            "id": current_user.id,
+            "email": current_user.email,
+            "first_name": current_user.first_name,
+            "last_name": current_user.last_name,
+            "role": current_user.role,
+            "company_id": current_user.company_id,
+            "created_at": current_user.created_at.isoformat(),
+        },
+        "recorded_actions": [
+            {
+                "at": entry.created_at.isoformat(),
+                "action": entry.action,
+                "entity_type": entry.entity_type,
+                "entity_id": entry.entity_id,
+            }
+            for entry in actions
+        ],
+    }
