@@ -740,6 +740,52 @@ function App() {
           </table>
         </div>
       </section>
+      <section className="card">
+        <div className="section-heading"><div><h2>Product Master</h2><p className="subtitle">Canonical products used by the platform.</p></div></div>
+        {(currentUser.role === "owner" || currentUser.role === "manager") && (
+          <form onSubmit={createProduct} className="form user-form">
+            <label>Name<input value={newProductName} onChange={(e) => setNewProductName(e.target.value)} required /></label>
+            <label>SKU<input value={newProductSku} onChange={(e) => setNewProductSku(e.target.value)} /></label>
+            <label>Base UOM<input value={newProductUom} onChange={(e) => setNewProductUom(e.target.value.toUpperCase())} required /></label>
+            <button type="submit">Create product</button>
+          </form>
+        )}
+        <div className="table-wrapper"><table><thead><tr><th>Name</th><th>SKU</th><th>Base UOM</th></tr></thead>
+          <tbody>{products.map((p) => <tr key={p.id}><td>{p.name}</td><td>{p.sku ?? "—"}</td><td>{p.base_uom}</td></tr>)}</tbody>
+        </table></div>
+      </section>
+
+      <section className="card">
+        <div className="section-heading"><div><h2>POS Product Mapping</h2><p className="subtitle">Map an external POS product to the canonical product.</p></div></div>
+        {(currentUser.role === "owner" || currentUser.role === "manager") && (
+          <form onSubmit={createMapping} className="form user-form">
+            <label>Integration ID<input value={mappingIntegrationId} onChange={(e) => setMappingIntegrationId(e.target.value)} required type="number" /></label>
+            <label>POS Product ID<input value={mappingExternalId} onChange={(e) => setMappingExternalId(e.target.value)} required /></label>
+            <label>Platform Product<select value={mappingProductId} onChange={(e) => setMappingProductId(e.target.value)} required><option value="">Select</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+            <button type="submit">Create mapping</button>
+          </form>
+        )}
+        <div className="table-wrapper"><table><thead><tr><th>POS Product</th><th>Platform Product</th><th>Method</th></tr></thead>
+          <tbody>{mappings.map((m) => <tr key={m.id}><td>{m.external_product_name ?? m.external_product_id}</td><td>{products.find((p) => p.id === m.product_id)?.name ?? m.product_id}</td><td>{m.match_method}</td></tr>)}</tbody>
+        </table></div>
+      </section>
+
+      <section className="card">
+        <div className="section-heading"><div><h2>UOM Conversions</h2><p className="subtitle">Normalize POS quantities into the product base UOM.</p></div></div>
+        {(currentUser.role === "owner" || currentUser.role === "manager") && (
+          <form onSubmit={createConversion} className="form user-form">
+            <label>Product<select value={conversionProductId} onChange={(e) => setConversionProductId(e.target.value)} required><option value="">Select</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.base_uom})</option>)}</select></label>
+            <label>From UOM<input value={conversionFromUom} onChange={(e) => setConversionFromUom(e.target.value.toUpperCase())} placeholder="CASE" required /></label>
+            <label>To UOM<input value={conversionToUom} onChange={(e) => setConversionToUom(e.target.value.toUpperCase())} placeholder="EA" required /></label>
+            <label>Factor<input value={conversionFactor} onChange={(e) => setConversionFactor(e.target.value)} type="number" step="0.000001" min="0.000001" required /></label>
+            <button type="submit">Create conversion</button>
+          </form>
+        )}
+        <div className="table-wrapper"><table><thead><tr><th>Product</th><th>From</th><th>To</th><th>Factor</th></tr></thead>
+          <tbody>{uomConversions.map((c) => <tr key={c.id}><td>{products.find((p) => p.id === c.product_id)?.name ?? c.product_id}</td><td>{c.from_uom}</td><td>{c.to_uom}</td><td>{c.factor}</td></tr>)}</tbody>
+        </table></div>
+      </section>
+
     </main>
   );
 }
