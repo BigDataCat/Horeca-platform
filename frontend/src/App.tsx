@@ -273,6 +273,16 @@ function App() {
     await loadIntegrations();
   }
 
+  async function syncIntegration(id: number) {
+    if (!token) return;
+    const response = await apiFetch(`/integrations/pos/${id}/sync`, { method: "POST" }, token);
+    if (!response.ok) { setError(await readError(response, "Could not sync POS integration.")); return; }
+    const result = await response.json();
+    setError(`Sync completed: ${result.fetched} fetched, ${result.imported} imported, ${result.skipped_duplicates} duplicates skipped.`);
+    await loadIntegrations();
+    await loadUnmatchedProducts();
+  }
+
   async function deactivateIntegration(id: number) {
     if (!token) return;
     const response = await apiFetch(`/integrations/pos/${id}`, { method: "DELETE" }, token);
@@ -860,6 +870,7 @@ function App() {
                     {(currentUser.role === "owner" || currentUser.role === "manager") && integration.active && (
                       <>
                         <button type="button" className="secondary" onClick={() => void testIntegration(integration.id)}>Test</button>
+                        <button type="button" className="secondary" onClick={() => void syncIntegration(integration.id)}>Sync</button>
                         <button type="button" className="danger" onClick={() => void deactivateIntegration(integration.id)}>Deactivate</button>
                       </>
                     )}
