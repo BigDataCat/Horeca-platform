@@ -34,6 +34,21 @@ type AuthResponse = {
   user: User;
 };
 
+type POSIntegration = {
+  id: number;
+  company_id: number;
+  location_id: number;
+  provider: string;
+  name: string;
+  connection_type: "api" | "webhook" | "file";
+  status: "inactive" | "connected" | "error";
+  base_url: string | null;
+  external_account_id: string | null;
+  credentials_ref: string | null;
+  config: Record<string, unknown> | null;
+  active: boolean;
+};
+
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api";
 const TOKEN_KEY = "horeca_access_token";
 
@@ -64,6 +79,7 @@ function App() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [integrations, setIntegrations] = useState<POSIntegration[]>([]);
   const [products, setProducts] = useState<{ id: number; name: string; sku: string | null; base_uom: string; active: boolean }[]>([]);
   const [mappings, setMappings] = useState<{ id: number; integration_id: number; external_product_id: string; external_product_name: string | null; product_id: number; match_method: string }[]>([]);
   const [uomConversions, setUomConversions] = useState<{ id: number; product_id: number; from_uom: string; to_uom: string; factor: number }[]>([]);
@@ -75,6 +91,13 @@ function App() {
     occurrences: number;
     total_quantity: number;
   }[]>([]);
+  const [newIntegrationName, setNewIntegrationName] = useState("");
+  const [newIntegrationProvider, setNewIntegrationProvider] = useState("mock");
+  const [newIntegrationLocationId, setNewIntegrationLocationId] = useState("");
+  const [newIntegrationConnectionType, setNewIntegrationConnectionType] = useState<POSIntegration["connection_type"]>("api");
+  const [newIntegrationBaseUrl, setNewIntegrationBaseUrl] = useState("");
+  const [newIntegrationAccountId, setNewIntegrationAccountId] = useState("");
+
   const [newProductName, setNewProductName] = useState("");
   const [newProductSku, setNewProductSku] = useState("");
   const [newProductUom, setNewProductUom] = useState("EA");
@@ -214,6 +237,49 @@ function App() {
     }
   }
 
+  async function loadIntegrations() {
+    if (!token) return;
+    const response = await apiFetch("/integrations/pos", {}, token);
+    if (!response.ok) throw new Error(await readError(response, "Could not load POS integrations."));
+    setIntegrations(await response.json());
+  }
+
+  async function createIntegration(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    const response = await apiFetch("/integrations/pos", {
+      method: "POST",
+      body: JSON.stringify({
+        location_id: Number(newIntegrationLocationId),
+        provider: newIntegrationProvider,
+        name: newIntegrationName,
+        connection_type: newIntegrationConnectionType,
+        base_url: newIntegrationBaseUrl || null,
+        external_account_id: newIntegrationAccountId || null,
+      }),
+    }, token);
+    if (!response.ok) { setError(await readError(response, "Could not create POS integration.")); return; }
+    setNewIntegrationName("");
+    setNewIntegrationLocationId("");
+    setNewIntegrationBaseUrl("");
+    setNewIntegrationAccountId("");
+    await loadIntegrations();
+  }
+
+  async function testIntegration(id: number) {
+    if (!token) return;
+    const response = await apiFetch(`/integrations/pos/${id}/test`, { method: "POST" }, token);
+    if (!response.ok) { setError(await readError(response, "Could not test POS integration.")); return; }
+    await loadIntegrations();
+  }
+
+  async function deactivateIntegration(id: number) {
+    if (!token) return;
+    const response = await apiFetch(`/integrations/pos/${id}`, { method: "DELETE" }, token);
+    if (!response.ok) { setError(await readError(response, "Could not deactivate POS integration.")); return; }
+    await loadIntegrations();
+  }
+
   async function loadProducts() {
     if (!token) return;
     const response = await apiFetch("/products", {}, token);
@@ -303,6 +369,7 @@ function App() {
       void loadMe(token);
       void loadCompanies(token);
       void loadUsers();
+      void loadIntegrations();
       void loadProducts();
       void loadMappings();
       void loadUomConversions();
@@ -756,6 +823,54 @@ function App() {
           </table>
         </div>
       </section>
+      <section className="card">
+        <div className="section-heading">
+          <div>
+            <h2>POS Integrations</h2>
+            <p className="subtitle">Connect a POS account to a specific HoReCa location. The integration ID is now managed by the platform.</p>
+          </div>
+          <button type="button" className="secondary" onClick={() => void loadIntegrations()}>Refresh</button>
+        </div>
+
+        {(currentUser.role === "owner" || currentUser.role === "manager") && (
+          <form onSubmit={createIntegration} className="form user-form">
+            <label>Name<input value={newIntegrationName} onChange={(e) => setNewIntegrationName(e.target.value)} placeholder="Main POS" required /></label>
+            <label>Provider<input value={newIntegrationProvider} onChange={(e) => setNewIntegrationProvider(e.target.value.toLowerCase())} placeholder="mock" required /></label>
+            <label>Location<select value={newIntegrationLocationId} onChange={(e) => setNewIntegrationLocationId(e.target.value)} required><option value="">Select</option>{locations.filter((l) => l.active).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+            <label>Connection<select value={newIntegrationConnectionType} onChange={(e) => setNewIntegrationConnectionType(e.target.value as POSIntegration["connection_type"])}><option value="api">API</option><option value="webhook">Webhook</option><option value="file">File</option></select></label>
+            <label>Base URL<input value={newIntegrationBaseUrl} onChange={(e) => setNewIntegrationBaseUrl(e.target.value)} placeholder="https://..." /></label>
+            <label>External Account ID<input value={newIntegrationAccountId} onChange={(e) => setNewIntegrationAccountId(e.target.value)} /></label>
+            <button type="submit">Add integration</button>
+          </form>
+        )}
+
+        <div className="table-wrapper">
+          <table>
+            <thead><tr><th>Name</th><th>Provider</th><th>Location</th><th>Connection</th><th>Status</th><th>ID</th><th /></tr></thead>
+            <tbody>
+              {integrations.map((integration) => (
+                <tr key={integration.id}>
+                  <td>{integration.name}</td>
+                  <td>{integration.provider}</td>
+                  <td>{locations.find((l) => l.id === integration.location_id)?.name ?? integration.location_id}</td>
+                  <td>{integration.connection_type}</td>
+                  <td>{integration.active ? integration.status : "inactive"}</td>
+                  <td>{integration.id}</td>
+                  <td className="actions">
+                    {(currentUser.role === "owner" || currentUser.role === "manager") && integration.active && (
+                      <>
+                        <button type="button" className="secondary" onClick={() => void testIntegration(integration.id)}>Test</button>
+                        <button type="button" className="danger" onClick={() => void deactivateIntegration(integration.id)}>Deactivate</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section className="card">
         <div className="section-heading"><div><h2>Product Master</h2><p className="subtitle">Canonical products used by the platform.</p></div></div>
         {(currentUser.role === "owner" || currentUser.role === "manager") && (
