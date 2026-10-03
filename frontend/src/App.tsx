@@ -351,6 +351,8 @@ function App() {
     setError(`Sync completed: ${result.fetched} fetched, ${result.imported} imported, ${result.skipped_duplicates} duplicates skipped.`);
     await loadIntegrations();
     await loadUnmatchedProducts();
+    await loadStock();
+    await loadDashboard();
   }
 
   async function deactivateIntegration(id: number) {
