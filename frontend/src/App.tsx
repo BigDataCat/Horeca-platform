@@ -34,6 +34,13 @@ type AuthResponse = {
   user: User;
 };
 
+type POSProvider = {
+  provider: string;
+  display_name: string;
+  supported_connection_types: ("api" | "webhook" | "file")[];
+  capabilities: string[];
+};
+
 type POSIntegration = {
   id: number;
   company_id: number;
@@ -80,6 +87,7 @@ function App() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [integrations, setIntegrations] = useState<POSIntegration[]>([]);
+  const [posProviders, setPosProviders] = useState<POSProvider[]>([]);
   const [products, setProducts] = useState<{ id: number; name: string; sku: string | null; base_uom: string; active: boolean }[]>([]);
   const [mappings, setMappings] = useState<{ id: number; integration_id: number; external_product_id: string; external_product_name: string | null; product_id: number; match_method: string }[]>([]);
   const [uomConversions, setUomConversions] = useState<{ id: number; product_id: number; from_uom: string; to_uom: string; factor: number }[]>([]);
@@ -237,6 +245,16 @@ function App() {
     }
   }
 
+  async function loadPosProviders() {
+    const response = await apiFetch("/integrations/pos/providers");
+    if (!response.ok) throw new Error(await readError(response, "Could not load POS providers."));
+    const data: POSProvider[] = await response.json();
+    setPosProviders(data);
+    if (data.length > 0 && !data.some((provider) => provider.provider === newIntegrationProvider)) {
+      setNewIntegrationProvider(data[0].provider);
+    }
+  }
+
   async function loadIntegrations() {
     if (!token) return;
     const response = await apiFetch("/integrations/pos", {}, token);
@@ -379,6 +397,7 @@ function App() {
       void loadMe(token);
       void loadCompanies(token);
       void loadUsers();
+      void loadPosProviders();
       void loadIntegrations();
       void loadProducts();
       void loadMappings();
@@ -845,7 +864,7 @@ function App() {
         {(currentUser.role === "owner" || currentUser.role === "manager") && (
           <form onSubmit={createIntegration} className="form user-form">
             <label>Name<input value={newIntegrationName} onChange={(e) => setNewIntegrationName(e.target.value)} placeholder="Main POS" required /></label>
-            <label>Provider<select value={newIntegrationProvider} onChange={(e) => setNewIntegrationProvider(e.target.value)}><option value="demo">Demo POS</option><option value="mock">Mock</option></select></label>
+            <label>Provider<select value={newIntegrationProvider} onChange={(e) => setNewIntegrationProvider(e.target.value)} required><option value="">Select</option>{posProviders.map((provider) => <option key={provider.provider} value={provider.provider}>{provider.display_name}</option>)}</select></label>
             <label>Location<select value={newIntegrationLocationId} onChange={(e) => setNewIntegrationLocationId(e.target.value)} required><option value="">Select</option>{locations.filter((l) => l.active).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
             <label>Connection<select value={newIntegrationConnectionType} onChange={(e) => setNewIntegrationConnectionType(e.target.value as POSIntegration["connection_type"])}><option value="api">API</option><option value="webhook">Webhook</option><option value="file">File</option></select></label>
             <label>Base URL<input value={newIntegrationBaseUrl} onChange={(e) => setNewIntegrationBaseUrl(e.target.value)} placeholder="https://..." /></label>
