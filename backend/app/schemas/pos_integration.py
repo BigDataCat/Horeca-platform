@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -40,6 +41,8 @@ class POSIntegrationRead(BaseModel):
     external_account_id: str | None
     credentials_ref: str | None
     config: dict | None
+    last_sync_cursor: str | None
+    last_synced_at: datetime | None
     active: bool
 
     model_config = ConfigDict(from_attributes=True)
