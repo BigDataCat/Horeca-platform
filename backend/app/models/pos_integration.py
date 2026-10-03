@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, JSON, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -32,6 +33,8 @@ class POSIntegration(TimestampMixin, Base):
     external_account_id: Mapped[str | None] = mapped_column(String(200))
     credentials_ref: Mapped[str | None] = mapped_column(String(500))
     config: Mapped[dict | None] = mapped_column(JSON)
+    last_sync_cursor: Mapped[str | None] = mapped_column(String(500))
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
