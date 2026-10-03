@@ -13,11 +13,17 @@ class ConnectorResult:
     message: str
 
 
+@dataclass
+class SalesPullResult:
+    sales: list[CanonicalSale]
+    next_cursor: str | None = None
+
+
 class POSConnector(Protocol):
     def test_connection(self, integration: POSIntegration) -> ConnectorResult:
         ...
 
-    def pull_sales(self, integration: POSIntegration) -> list[CanonicalSale]:
+    def pull_sales(self, integration: POSIntegration, cursor: str | None = None) -> SalesPullResult:
         ...
 
 
@@ -28,8 +34,8 @@ class MockPOSConnector:
             message=f"Mock connector for {integration.provider} is reachable.",
         )
 
-    def pull_sales(self, integration: POSIntegration) -> list[CanonicalSale]:
-        return []
+    def pull_sales(self, integration: POSIntegration, cursor: str | None = None) -> SalesPullResult:
+        return SalesPullResult(sales=[], next_cursor=cursor)
 
 
 class DemoPOSConnector:
@@ -47,8 +53,11 @@ class DemoPOSConnector:
             message="Demo POS connector is ready. No external POS credentials are required.",
         )
 
-    def pull_sales(self, integration: POSIntegration) -> list[CanonicalSale]:
-        return [
+    def pull_sales(self, integration: POSIntegration, cursor: str | None = None) -> SalesPullResult:
+        if cursor is not None:
+            return SalesPullResult(sales=[], next_cursor=cursor)
+
+        sales = [
             CanonicalSale(
                 external_id="DEMO-SALE-1001",
                 occurred_at=datetime(2026, 10, 1, 18, 30, tzinfo=timezone.utc),
@@ -88,6 +97,10 @@ class DemoPOSConnector:
                 ],
             ),
         ]
+        return SalesPullResult(
+            sales=sales,
+            next_cursor="2026-10-01T19:15:00Z",
+        )
 
 
 @dataclass(frozen=True)
