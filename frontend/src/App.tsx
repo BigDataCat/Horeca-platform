@@ -92,7 +92,7 @@ function App() {
     total_quantity: number;
   }[]>([]);
   const [newIntegrationName, setNewIntegrationName] = useState("");
-  const [newIntegrationProvider, setNewIntegrationProvider] = useState("mock");
+  const [newIntegrationProvider, setNewIntegrationProvider] = useState("demo");
   const [newIntegrationLocationId, setNewIntegrationLocationId] = useState("");
   const [newIntegrationConnectionType, setNewIntegrationConnectionType] = useState<POSIntegration["connection_type"]>("api");
   const [newIntegrationBaseUrl, setNewIntegrationBaseUrl] = useState("");
@@ -845,7 +845,7 @@ function App() {
         {(currentUser.role === "owner" || currentUser.role === "manager") && (
           <form onSubmit={createIntegration} className="form user-form">
             <label>Name<input value={newIntegrationName} onChange={(e) => setNewIntegrationName(e.target.value)} placeholder="Main POS" required /></label>
-            <label>Provider<input value={newIntegrationProvider} onChange={(e) => setNewIntegrationProvider(e.target.value.toLowerCase())} placeholder="mock" required /></label>
+            <label>Provider<select value={newIntegrationProvider} onChange={(e) => setNewIntegrationProvider(e.target.value)}><option value="demo">Demo POS</option><option value="mock">Mock</option></select></label>
             <label>Location<select value={newIntegrationLocationId} onChange={(e) => setNewIntegrationLocationId(e.target.value)} required><option value="">Select</option>{locations.filter((l) => l.active).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
             <label>Connection<select value={newIntegrationConnectionType} onChange={(e) => setNewIntegrationConnectionType(e.target.value as POSIntegration["connection_type"])}><option value="api">API</option><option value="webhook">Webhook</option><option value="file">File</option></select></label>
             <label>Base URL<input value={newIntegrationBaseUrl} onChange={(e) => setNewIntegrationBaseUrl(e.target.value)} placeholder="https://..." /></label>
