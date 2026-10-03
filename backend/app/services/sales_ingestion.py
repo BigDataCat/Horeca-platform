@@ -1,7 +1,7 @@
 import json
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.pos_integration import POSIntegration
@@ -45,7 +45,7 @@ def resolve_product(
     return db.scalar(
         select(Product).where(
             Product.company_id == company_id,
-            Product.name.ilike(product_name),
+            func.lower(Product.name) == product_name.lower(),
         )
     )
 
@@ -148,6 +148,8 @@ def import_sale(
             )
 
     db.add(sale)
+    # Make the new sale visible to the duplicate check for later sales in the same batch.
+    db.flush()
     return True
 
 

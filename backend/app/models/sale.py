@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -15,6 +15,9 @@ if TYPE_CHECKING:
 
 class Sale(TimestampMixin, Base):
     __tablename__ = "sales"
+    __table_args__ = (
+        UniqueConstraint("integration_id", "external_id", name="uq_sales_integration_external_id"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(
