@@ -5,12 +5,13 @@ from app.api.auth import router as auth_router
 from app.api.companies import router as companies_router
 from app.api.locations import router as locations_router
 from app.api.pos_integrations import router as pos_integrations_router
+from app.api.pos_providers import router as pos_providers_router
 from app.api.product_mappings import router as product_mappings_router
 from app.api.products import router as products_router
 from app.api.sales import router as sales_router
 from app.api.users import router as users_router
 
-app = FastAPI(title="HoReCa Management Platform API", version="0.8.0")
+app = FastAPI(title="HoReCa Management Platform API", version="0.9.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +25,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(companies_router, prefix="/api")
 app.include_router(locations_router, prefix="/api")
 app.include_router(pos_integrations_router, prefix="/api")
+app.include_router(pos_providers_router, prefix="/api")
 app.include_router(product_mappings_router, prefix="/api")
 app.include_router(products_router, prefix="/api")
 app.include_router(sales_router, prefix="/api")
