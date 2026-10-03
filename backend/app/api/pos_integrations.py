@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -6,6 +8,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.location import Location
 from app.models.pos_integration import POSIntegration
+from app.models.sync_run import SyncRun
 from app.models.user import User
 from app.schemas.pos_integration import (
     ConnectionTestResult,
@@ -14,6 +17,7 @@ from app.schemas.pos_integration import (
     POSIntegrationUpdate,
     POSSyncResult,
 )
+from app.schemas.sync_runs import SyncRunRead
 from app.services.pos_connectors import get_connector
 from app.services.sales_ingestion import import_sale
 
@@ -42,6 +46,29 @@ def list_integrations(
     )
 
 
+@router.get("/{integration_id}/sync-runs", response_model=list[SyncRunRead])
+def list_sync_runs(
+    integration_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[SyncRun]:
+    integration = db.get(POSIntegration, integration_id)
+    if integration is None or integration.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="POS integration not found")
+
+    return list(
+        db.scalars(
+            select(SyncRun)
+            .where(
+                SyncRun.company_id == current_user.company_id,
+                SyncRun.integration_id == integration_id,
+            )
+            .order_by(SyncRun.started_at.desc())
+            .limit(50)
+        ).all()
+    )
+
+
 @router.post("", response_model=POSIntegrationRead, status_code=status.HTTP_201_CREATED)
 def create_integration(
     payload: POSIntegrationCreate,
@@ -53,10 +80,7 @@ def create_integration(
     location = db.get(Location, payload.location_id)
 
     if location is None or location.company_id != current_user.company_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Location not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
 
     integration = POSIntegration(
         company_id=current_user.company_id,
@@ -89,10 +113,7 @@ def update_integration(
     integration = db.get(POSIntegration, integration_id)
 
     if integration is None or integration.company_id != current_user.company_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="POS integration not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="POS integration not found")
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(integration, field, value)
@@ -113,10 +134,7 @@ def deactivate_integration(
     integration = db.get(POSIntegration, integration_id)
 
     if integration is None or integration.company_id != current_user.company_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="POS integration not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="POS integration not found")
 
     integration.active = False
     integration.status = "inactive"
@@ -141,36 +159,62 @@ def sync_integration(
     if not integration.active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="POS integration is inactive")
 
+    sync_run = SyncRun(
+        company_id=integration.company_id,
+        integration_id=integration.id,
+        started_at=datetime.now(timezone.utc),
+        status="running",
+    )
+    db.add(sync_run)
+    db.commit()
+    db.refresh(sync_run)
+
     try:
         connector = get_connector(integration.provider)
         sales = connector.pull_sales(integration)
+        sync_run.fetched = len(sales)
+
+        for sale in sales:
+            if import_sale(db, integration, sale):
+                sync_run.imported += 1
+            else:
+                sync_run.skipped_duplicates += 1
+
+        integration.status = "connected"
+        sync_run.status = "success"
+        sync_run.finished_at = datetime.now(timezone.utc)
+        db.commit()
+
     except ValueError as exc:
+        db.rollback()
+        sync_run = db.get(SyncRun, sync_run.id)
+        if sync_run is not None:
+            sync_run.status = "error"
+            sync_run.finished_at = datetime.now(timezone.utc)
+            sync_run.error_message = str(exc)
+            db.commit()
         integration.status = "error"
         db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
     except Exception as exc:
+        db.rollback()
+        sync_run = db.get(SyncRun, sync_run.id)
+        if sync_run is not None:
+            sync_run.status = "error"
+            sync_run.finished_at = datetime.now(timezone.utc)
+            sync_run.error_message = str(exc)
+            db.commit()
         integration.status = "error"
         db.commit()
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"POS sync failed: {exc}")
 
-    imported = 0
-    skipped_duplicates = 0
-
-    for sale in sales:
-        if import_sale(db, integration, sale):
-            imported += 1
-        else:
-            skipped_duplicates += 1
-
-    integration.status = "connected"
-    db.commit()
-
     return POSSyncResult(
         integration_id=integration.id,
         provider=integration.provider,
-        fetched=len(sales),
-        imported=imported,
-        skipped_duplicates=skipped_duplicates,
+        fetched=sync_run.fetched,
+        imported=sync_run.imported,
+        skipped_duplicates=sync_run.skipped_duplicates,
     )
 
 
@@ -185,10 +229,7 @@ def test_integration(
     integration = db.get(POSIntegration, integration_id)
 
     if integration is None or integration.company_id != current_user.company_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="POS integration not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="POS integration not found")
 
     try:
         connector = get_connector(integration.provider)
