@@ -34,6 +34,15 @@ class SalesImportResult(BaseModel):
     skipped_duplicates: int
 
 
+class UnmatchedProductRead(BaseModel):
+    integration_id: int
+    external_product_id: str
+    product_name: str
+    uom: str
+    occurrences: int
+    total_quantity: Decimal
+
+
 class SaleLineRead(BaseModel):
     id: int
     product_id: int | None
