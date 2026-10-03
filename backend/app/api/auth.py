@@ -9,7 +9,7 @@ from app.core.rate_limit import SlidingWindowLimiter
 from app.core.security import create_access_token, get_current_user, hash_password, verify_password
 from app.models.company import Company
 from app.models.user import User
-from app.schemas.user import BootstrapRequest, TokenResponse, UserCreate, UserLogin, UserRead
+from app.schemas.user import BootstrapRequest, PasswordChange, TokenResponse, UserCreate, UserLogin, UserRead
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -124,3 +124,32 @@ def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)) -
 @router.get("/me", response_model=UserRead)
 def get_me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.post("/change-password", response_model=TokenResponse)
+def change_password(
+    payload: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """Change the caller's password. All existing tokens are invalidated; a fresh one is returned."""
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    if payload.current_password == payload.new_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password must differ from the current one")
+
+    current_user.password_hash = hash_password(payload.new_password)
+    current_user.token_version += 1
+    db.commit()
+    db.refresh(current_user)
+    return TokenResponse(access_token=create_access_token(current_user), user=current_user)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Invalidate every token issued to the caller (all devices)."""
+    current_user.token_version += 1
+    db.commit()

@@ -31,6 +31,7 @@ def create_access_token(user: User) -> str:
         "sub": str(user.id),
         "company_id": user.company_id,
         "role": user.role,
+        "tv": user.token_version,
         "exp": expires_at,
     }
 
@@ -63,7 +64,7 @@ def get_current_user(
 
     user = db.get(User, user_id)
 
-    if user is None or not user.active:
+    if user is None or not user.active or payload.get("tv", 0) != user.token_version:
         raise credentials_error
 
     return user

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user, hash_password
 from app.models.user import User
-from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.user import PasswordReset, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -84,7 +84,12 @@ def update_user(
     if current_user.role == "manager" and payload.role == "owner":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Managers cannot promote users to owner")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    values = payload.model_dump(exclude_unset=True)
+    if ("role" in values and values["role"] != user.role) or values.get("active") is False:
+        # Role changes and deactivation take effect immediately, not when the token expires.
+        user.token_version += 1
+
+    for field, value in values.items():
         setattr(user, field, value)
 
     db.commit()
@@ -112,6 +117,35 @@ def deactivate_user(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Managers cannot deactivate owners")
 
     user.active = False
+    user.token_version += 1
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/{user_id}/reset-password", response_model=UserRead)
+def reset_user_password(
+    user_id: int,
+    payload: PasswordReset,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """Administrative reset: sets a new password and signs the user out everywhere."""
+    require_manager(current_user)
+
+    user = db.get(User, user_id)
+
+    if user is None or user.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Use change-password for your own account")
+
+    if current_user.role == "manager" and user.role == "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Managers cannot reset owner passwords")
+
+    user.password_hash = hash_password(payload.new_password)
+    user.token_version += 1
     db.commit()
     db.refresh(user)
     return user
