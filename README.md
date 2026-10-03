@@ -67,7 +67,7 @@ Existing POS
 
 The migration chain currently reaches:
 
-`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013`
+`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013 → 0014 → 0015`
 
 ## Run locally
 
@@ -122,8 +122,8 @@ VITE_API_URL=http://localhost:8000/api
 
 - Set `APP_ENV=production` and a strong, unique `JWT_SECRET_KEY` (at least 32 characters); the API refuses to start in production with the default or a short secret.
 - Set `CORS_ORIGINS` to the deployed frontend origin(s).
-- Store POS webhook tokens in a proper secret manager before production.
-- Run Alembic migrations before starting the API.
+- Webhook tokens are generated with `POST /api/integrations/pos/{id}/webhook-token` and stored only as SHA-256 hashes. Provider credentials (`credentials_ref`) should point to a secret manager.
+- Migrations run automatically through the one-shot `migrate` service in `docker-compose.yml`; when deploying elsewhere, run `alembic upgrade head` as a release step before starting the API.
 - Use HTTPS for API and webhook endpoints.
 - Replace demo/mock connectors with provider-specific implementations.
 

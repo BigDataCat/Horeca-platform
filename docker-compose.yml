@@ -17,6 +17,18 @@ services:
       timeout: 5s
       retries: 10
 
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-horeca}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-horeca}
+      APP_ENV: ${APP_ENV:-development}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend:
     build: ./backend
     restart: unless-stopped
@@ -28,6 +40,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
 

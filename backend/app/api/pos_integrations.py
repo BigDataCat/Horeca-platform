@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,6 +17,7 @@ from app.schemas.pos_integration import (
     POSIntegrationCreate,
     POSIntegrationRead,
     POSIntegrationUpdate,
+    WebhookTokenResponse,
     POSSyncResult,
 )
 from app.schemas.sync_runs import SyncRunRead
@@ -69,6 +72,14 @@ def list_sync_runs(
     )
 
 
+def reject_secrets_in_config(config: dict | None) -> None:
+    if config and "webhook_token" in config:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Do not store webhook tokens in config; generate one with POST /{id}/webhook-token",
+        )
+
+
 @router.post("", response_model=POSIntegrationRead, status_code=status.HTTP_201_CREATED)
 def create_integration(
     payload: POSIntegrationCreate,
@@ -76,6 +87,7 @@ def create_integration(
     db: Session = Depends(get_db),
 ) -> POSIntegration:
     require_manager(current_user)
+    reject_secrets_in_config(payload.config)
 
     location = db.get(Location, payload.location_id)
 
@@ -109,6 +121,7 @@ def update_integration(
     db: Session = Depends(get_db),
 ) -> POSIntegration:
     require_manager(current_user)
+    reject_secrets_in_config(payload.config)
 
     integration = db.get(POSIntegration, integration_id)
 
@@ -219,6 +232,26 @@ def sync_integration(
         imported=sync_run.imported,
         skipped_duplicates=sync_run.skipped_duplicates,
     )
+
+
+@router.post("/{integration_id}/webhook-token", response_model=WebhookTokenResponse)
+def rotate_webhook_token(
+    integration_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> WebhookTokenResponse:
+    """Generate (or rotate) the webhook token. Only its SHA-256 hash is stored."""
+    require_manager(current_user)
+
+    integration = db.get(POSIntegration, integration_id)
+
+    if integration is None or integration.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="POS integration not found")
+
+    token = secrets.token_urlsafe(32)
+    integration.webhook_token_hash = hashlib.sha256(token.encode()).hexdigest()
+    db.commit()
+    return WebhookTokenResponse(integration_id=integration.id, webhook_token=token)
 
 
 @router.post("/{integration_id}/test", response_model=ConnectionTestResult)

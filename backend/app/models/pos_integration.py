@@ -33,10 +33,15 @@ class POSIntegration(TimestampMixin, Base):
     external_account_id: Mapped[str | None] = mapped_column(String(200))
     credentials_ref: Mapped[str | None] = mapped_column(String(500))
     config: Mapped[dict | None] = mapped_column(JSON)
+    webhook_token_hash: Mapped[str | None] = mapped_column(String(64))
     last_sync_cursor: Mapped[str | None] = mapped_column(String(500))
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    @property
+    def webhook_configured(self) -> bool:
+        return self.webhook_token_hash is not None
 
     company: Mapped["Company"] = relationship()
     location: Mapped["Location"] = relationship()

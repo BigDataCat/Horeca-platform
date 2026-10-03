@@ -136,3 +136,30 @@ def test_register_refused_for_company_with_users(client, tenant_a):
 
 def test_health(client):
     assert client.get("/health").json() == {"status": "ok", "database": "ok"}
+
+
+def test_login_is_rate_limited_after_repeated_failures(client, tenant_a):
+    from app.core.config import settings
+
+    for _ in range(settings.login_max_attempts):
+        assert client.post(
+            "/api/auth/login", json={"email": tenant_a["email"], "password": "wrong-password"}
+        ).status_code == 401
+    blocked = client.post(
+        "/api/auth/login", json={"email": tenant_a["email"], "password": tenant_a["password"]}
+    )
+    assert blocked.status_code == 429
+    assert "Retry-After" in blocked.headers
+
+
+def test_successful_login_clears_failures(client, tenant_a):
+    for _ in range(3):
+        client.post("/api/auth/login", json={"email": tenant_a["email"], "password": "wrong-password"})
+    ok = client.post("/api/auth/login", json={"email": tenant_a["email"], "password": tenant_a["password"]})
+    assert ok.status_code == 200
+
+
+def test_responses_carry_request_id(client):
+    response = client.get("/health", headers={"X-Request-ID": "abc123"})
+    assert response.headers["X-Request-ID"] == "abc123"
+    assert client.get("/health").headers["X-Request-ID"]

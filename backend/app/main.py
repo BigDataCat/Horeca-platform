@@ -1,4 +1,9 @@
-from fastapi import FastAPI
+import json
+import logging
+import time
+import uuid
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from app.core.config import settings
@@ -19,7 +24,36 @@ from app.api.products import router as products_router
 from app.api.sales import router as sales_router
 from app.api.users import router as users_router
 
+logger = logging.getLogger("horeca.api")
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 app = FastAPI(title="HoReCa Management Platform API", version="1.3.0")
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
+    started = time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        response.headers["X-Request-ID"] = request_id
+        return response
+    finally:
+        logger.info(
+            json.dumps(
+                {
+                    "event": "http_request",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status": status_code,
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+                }
+            )
+        )
+
 
 app.add_middleware(
     CORSMiddleware,

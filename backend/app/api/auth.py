@@ -1,15 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
+from app.core.rate_limit import SlidingWindowLimiter
 from app.core.security import create_access_token, get_current_user, hash_password, verify_password
 from app.models.company import Company
 from app.models.user import User
 from app.schemas.user import BootstrapRequest, TokenResponse, UserCreate, UserLogin, UserRead
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
+
+login_limiter = SlidingWindowLimiter(settings.login_max_attempts, settings.login_window_seconds)
 
 
 @router.post("/bootstrap", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -87,10 +91,23 @@ def register_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: UserLogin, db: Session = Depends(get_db)) -> TokenResponse:
-    user = db.scalar(select(User).where(func.lower(User.email) == str(payload.email).lower()))
+def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
+    email = str(payload.email).lower()
+    client_host = request.client.host if request.client else "unknown"
+    limiter_keys = (f"email:{email}", f"ip:{client_host}")
+
+    if any(login_limiter.is_blocked(key) for key in limiter_keys):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Try again later.",
+            headers={"Retry-After": str(settings.login_window_seconds)},
+        )
+
+    user = db.scalar(select(User).where(func.lower(User.email) == email))
 
     if user is None or not verify_password(payload.password, user.password_hash):
+        for key in limiter_keys:
+            login_limiter.record_failure(key)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -100,6 +117,7 @@ def login(payload: UserLogin, db: Session = Depends(get_db)) -> TokenResponse:
     if not user.active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
 
+    login_limiter.reset(limiter_keys[0])
     return TokenResponse(access_token=create_access_token(user), user=user)
 
 

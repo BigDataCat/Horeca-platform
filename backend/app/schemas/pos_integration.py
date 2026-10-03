@@ -29,6 +29,12 @@ class POSIntegrationUpdate(BaseModel):
     status: IntegrationStatus | None = None
 
 
+class WebhookTokenResponse(BaseModel):
+    integration_id: int
+    webhook_token: str
+    note: str = "Store this token now; it cannot be shown again."
+
+
 class POSIntegrationRead(BaseModel):
     id: int
     company_id: int
@@ -41,6 +47,7 @@ class POSIntegrationRead(BaseModel):
     external_account_id: str | None
     credentials_ref: str | None
     config: dict | None
+    webhook_configured: bool = False
     last_sync_cursor: str | None
     last_synced_at: datetime | None
     active: bool

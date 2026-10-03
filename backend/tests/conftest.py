@@ -47,6 +47,15 @@ def clean_tables(migrated_database):
         connection.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
 
 
+@pytest.fixture(autouse=True)
+def reset_login_limiter():
+    from app.api.auth import login_limiter
+
+    login_limiter.clear()
+    yield
+    login_limiter.clear()
+
+
 @pytest.fixture()
 def client():
     with TestClient(app) as test_client:
@@ -237,3 +246,12 @@ def create_recipe(client, tenant, product, lines, location=None, name="Recipe"):
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def with_webhook_token(client, tenant, integration):
+    """Generate a webhook token and attach it to the integration dict as ``token``."""
+    response = client.post(
+        f"/api/integrations/pos/{integration['id']}/webhook-token", headers=tenant["headers"]
+    )
+    assert response.status_code == 200, response.text
+    return {**integration, "token": response.json()["webhook_token"]}

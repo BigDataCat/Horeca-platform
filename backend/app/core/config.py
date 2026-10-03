@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     cors_origins: str = "http://localhost:5173"
+    login_max_attempts: int = 10
+    login_window_seconds: int = 300
 
     @model_validator(mode="after")
     def reject_insecure_production_secret(self) -> "Settings":

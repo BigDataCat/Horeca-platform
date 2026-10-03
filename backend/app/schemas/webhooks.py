@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.sales import CanonicalSale
 
@@ -14,3 +16,17 @@ class POSWebhookResponse(BaseModel):
     accepted: bool
     duplicate: bool
     message: str
+
+
+class WebhookEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    integration_id: int
+    external_event_id: str
+    event_type: str
+    received_at: datetime
+    status: str
+    attempts: int
+    error_message: str | None
+    processed_at: datetime | None
