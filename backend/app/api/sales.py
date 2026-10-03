@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.pos_integration import POSIntegration
+from app.models.sale import Sale
 from app.models.user import User
-from app.schemas.sales import SalesImportRequest, SalesImportResult
+from app.schemas.sales import SaleRead, SalesImportRequest, SalesImportResult
 from app.services.sales_ingestion import import_sale
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -13,10 +15,22 @@ router = APIRouter(prefix="/sales", tags=["sales"])
 
 def require_manager(user: User) -> None:
     if user.role not in {"owner", "manager"}:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Owner or manager role required",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner or manager role required")
+
+
+@router.get("", response_model=list[SaleRead])
+def list_sales(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[Sale]:
+    return list(
+        db.scalars(
+            select(Sale)
+            .options(selectinload(Sale.lines))
+            .where(Sale.company_id == current_user.company_id)
+            .order_by(Sale.occurred_at.desc())
+        ).all()
+    )
 
 
 @router.post("/import", response_model=SalesImportResult)
@@ -30,16 +44,10 @@ def import_sales(
     integration = db.get(POSIntegration, payload.integration_id)
 
     if integration is None or integration.company_id != current_user.company_id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="POS integration not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="POS integration not found")
 
     if not integration.active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="POS integration is inactive",
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="POS integration is inactive")
 
     imported = 0
     skipped_duplicates = 0
@@ -52,7 +60,4 @@ def import_sales(
 
     db.commit()
 
-    return SalesImportResult(
-        imported=imported,
-        skipped_duplicates=skipped_duplicates,
-    )
+    return SalesImportResult(imported=imported, skipped_duplicates=skipped_duplicates)

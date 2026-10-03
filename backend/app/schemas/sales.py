@@ -32,3 +32,33 @@ class SalesImportRequest(BaseModel):
 class SalesImportResult(BaseModel):
     imported: int
     skipped_duplicates: int
+
+
+class SaleLineRead(BaseModel):
+    id: int
+    product_id: int | None
+    external_product_id: str | None
+    product_name: str
+    quantity: Decimal
+    uom: str
+    unit_price: Decimal
+    net_value: Decimal
+    tax_value: Decimal
+
+    model_config = {"from_attributes": True}
+
+
+class SaleRead(BaseModel):
+    id: int
+    company_id: int
+    location_id: int
+    integration_id: int | None
+    external_id: str
+    occurred_at: datetime
+    currency: str
+    net_value: Decimal
+    tax_value: Decimal
+    gross_value: Decimal
+    lines: list[SaleLineRead]
+
+    model_config = {"from_attributes": True}
