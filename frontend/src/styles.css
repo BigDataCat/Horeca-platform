@@ -138,3 +138,6 @@ tbody tr:hover { background: #f9fafb; }
   .form, .location-form, .user-form { grid-template-columns: 1fr; }
   .topbar { flex-direction: column; }
 }
+
+
+.dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:16px}.metric{border:1px solid #ddd;border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:8px}.metric span{font-size:.85rem;opacity:.7}.metric strong{font-size:1.35rem}
