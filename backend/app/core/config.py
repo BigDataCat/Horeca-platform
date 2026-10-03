@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     cors_origins: str = "http://localhost:5173"
+    default_plan: str = "business"
+    admin_api_key: str | None = None
+    metrics_token: str | None = None
     worker_poll_seconds: int = 30
     login_max_attempts: int = 10
     login_window_seconds: int = 300

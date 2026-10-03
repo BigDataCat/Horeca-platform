@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user, hash_password
 from app.models.user import User
+from app.services.plans import enforce_limit
 from app.schemas.user import PasswordReset, UserCreate, UserRead, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -43,6 +44,8 @@ def create_user(
 
     if current_user.role == "manager" and payload.role == "owner":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Managers cannot create owners")
+
+    enforce_limit(db, current_user.company_id, "users")
 
     user = User(
         company_id=current_user.company_id,
@@ -85,6 +88,8 @@ def update_user(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Managers cannot promote users to owner")
 
     values = payload.model_dump(exclude_unset=True)
+    if values.get("active") is True and not user.active:
+        enforce_limit(db, current_user.company_id, "users")
     if ("role" in values and values["role"] != user.role) or values.get("active") is False:
         # Role changes and deactivation take effect immediately, not when the token expires.
         user.token_version += 1

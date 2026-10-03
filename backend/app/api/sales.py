@@ -227,7 +227,7 @@ async def import_sales_csv(
 
     body = await request.body()
     if len(body) > MAX_CSV_BYTES:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="CSV file is too large (5 MB maximum)")
+        raise HTTPException(status_code=413, detail="CSV file is too large (5 MB maximum)")
     try:
         text = body.decode("utf-8-sig")
     except UnicodeDecodeError:

@@ -48,6 +48,9 @@ def update_company(
     if company_id != current_user.company_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Company access denied")
 
+    if current_user.role != "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner role required")
+
     company = db.get(Company, company_id)
 
     if company is None:

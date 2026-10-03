@@ -22,6 +22,7 @@ from app.schemas.pos_integration import (
 )
 from app.schemas.sync_runs import SyncRunRead
 from app.services.pos_connectors import get_connector
+from app.services.plans import enforce_limit
 from app.services.sync import run_sync
 
 router = APIRouter(prefix="/integrations/pos", tags=["pos-integrations"])
@@ -94,6 +95,8 @@ def create_integration(
     if location is None or location.company_id != current_user.company_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
 
+    enforce_limit(db, current_user.company_id, "integrations")
+
     integration = POSIntegration(
         company_id=current_user.company_id,
         location_id=payload.location_id,
@@ -131,6 +134,8 @@ def update_integration(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="POS integration not found")
 
     values = payload.model_dump(exclude_unset=True)
+    if values.get("active") is True and not integration.active:
+        enforce_limit(db, current_user.company_id, "integrations")
     for field, value in values.items():
         setattr(integration, field, value)
 

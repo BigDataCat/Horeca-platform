@@ -14,5 +14,6 @@ class Company(TimestampMixin, Base):
     tax_identifier: Mapped[str | None] = mapped_column(String(50), unique=True)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RON")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    plan: Mapped[str] = mapped_column(String(30), nullable=False, default="business", server_default="business")
     locations: Mapped[list["Location"]] = relationship(back_populates="company", cascade="all, delete-orphan")
     users: Mapped[list["User"]] = relationship(back_populates="company", cascade="all, delete-orphan")

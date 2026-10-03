@@ -7,9 +7,15 @@ from app.core.security import get_current_user
 from app.models.company import Company
 from app.models.location import Location
 from app.models.user import User
+from app.services.plans import enforce_limit
 from app.schemas.location import LocationCreate, LocationRead, LocationUpdate
 
 router = APIRouter(prefix="/locations", tags=["locations"])
+
+
+def require_manager(user: User) -> None:
+    if user.role not in {"owner", "manager"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner or manager role required")
 
 
 @router.get("", response_model=list[LocationRead])
@@ -52,9 +58,12 @@ def create_location(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Location:
+    require_manager(current_user)
+
     if payload.company_id != current_user.company_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Company access denied")
 
+    enforce_limit(db, current_user.company_id, "locations")
     location = Location(**payload.model_dump())
     db.add(location)
     db.commit()
@@ -69,10 +78,14 @@ def update_location(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Location:
+    require_manager(current_user)
     location = db.get(Location, location_id)
 
     if location is None or location.company_id != current_user.company_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
+
+    if payload.active is True and not location.active:
+        enforce_limit(db, current_user.company_id, "locations")
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(location, field, value)
@@ -88,6 +101,7 @@ def deactivate_location(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Location:
+    require_manager(current_user)
     location = db.get(Location, location_id)
 
     if location is None or location.company_id != current_user.company_id:

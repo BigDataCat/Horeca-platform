@@ -9,6 +9,7 @@ from app.core.rate_limit import SlidingWindowLimiter
 from app.core.security import create_access_token, get_current_user, hash_password, verify_password
 from app.models.company import Company
 from app.models.user import User
+from app.services.plans import PLANS
 from app.schemas.user import BootstrapRequest, PasswordChange, TokenResponse, UserCreate, UserLogin, UserRead
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -29,6 +30,7 @@ def bootstrap_company(payload: BootstrapRequest, db: Session = Depends(get_db)) 
         name=payload.company_name,
         tax_identifier=payload.tax_identifier,
         currency=payload.currency.upper(),
+        plan=settings.default_plan if settings.default_plan in PLANS else "trial",
     )
     db.add(company)
     db.flush()
@@ -114,7 +116,7 @@ def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)) -
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if not user.active:
+    if not user.active or (user.company is not None and not user.company.active):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
 
     login_limiter.reset(limiter_keys[0])

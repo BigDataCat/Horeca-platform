@@ -67,5 +67,7 @@ def get_current_user(
     if user is None or not user.active or payload.get("tv", 0) != user.token_version:
         raise credentials_error
 
+    if user.company is not None and not user.company.active:
+        raise credentials_error
     db.info["actor"] = {"user_id": user.id, "company_id": user.company_id}
     return user
