@@ -1,0 +1,85 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.core.security import create_access_token, get_current_user, hash_password, verify_password
+from app.models.company import Company
+from app.models.user import User
+from app.schemas.user import TokenResponse, UserCreate, UserLogin, UserRead
+
+router = APIRouter(prefix="/auth", tags=["authentication"])
+
+
+@router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+def register_user(payload: UserCreate, db: Session = Depends(get_db)) -> User:
+    company = db.get(Company, payload.company_id)
+
+    if company is None or not company.active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Company not found",
+        )
+
+    existing_count = db.scalar(
+        select(func.count()).select_from(User).where(User.company_id == payload.company_id)
+    )
+
+    if existing_count and existing_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The company already has users. An authenticated company user must create additional users.",
+        )
+
+    user = User(
+        company_id=payload.company_id,
+        email=str(payload.email).lower(),
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        password_hash=hash_password(payload.password),
+        role="owner",
+    )
+
+    db.add(user)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this email already exists in the company",
+        )
+
+    db.refresh(user)
+    return user
+
+
+@router.post("/login", response_model=TokenResponse)
+def login(payload: UserLogin, db: Session = Depends(get_db)) -> TokenResponse:
+    user = db.scalar(
+        select(User).where(func.lower(User.email) == str(payload.email).lower())
+    )
+
+    if user is None or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is inactive",
+        )
+
+    return TokenResponse(
+        access_token=create_access_token(user),
+        user=user,
+    )
+
+
+@router.get("/me", response_model=UserRead)
+def get_me(current_user: User = Depends(get_current_user)) -> User:
+    return current_user
