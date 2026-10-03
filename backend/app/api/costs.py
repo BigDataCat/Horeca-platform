@@ -77,6 +77,7 @@ def calculate_recipe_cost(
     lines: list[RecipeCostLineRead] = []
     total: Decimal | None = Decimal("0")
     currency = "RON"
+    missing_cost = False
 
     for line in recipe.lines:
         cost = db.scalar(
@@ -107,12 +108,13 @@ def calculate_recipe_cost(
 
         line_cost = None
         unit_cost = None
-        if cost is not None:
+        if cost is not None and not missing_cost:
             unit_cost = cost.unit_cost
             line_cost = line.quantity * (Decimal("1") + line.waste_factor) * cost.unit_cost
             total += line_cost
             currency = cost.currency
-        else:
+        elif cost is None:
+            missing_cost = True
             total = None
 
         lines.append(
