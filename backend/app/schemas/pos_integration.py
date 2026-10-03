@@ -1,0 +1,52 @@
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+ConnectionType = Literal["api", "webhook", "file"]
+IntegrationStatus = Literal["inactive", "connected", "error"]
+
+
+class POSIntegrationCreate(BaseModel):
+    location_id: int
+    provider: str = Field(min_length=1, max_length=50)
+    name: str = Field(min_length=1, max_length=200)
+    connection_type: ConnectionType = "api"
+    base_url: str | None = Field(default=None, max_length=500)
+    external_account_id: str | None = Field(default=None, max_length=200)
+    credentials_ref: str | None = Field(default=None, max_length=500)
+    config: dict | None = None
+
+
+class POSIntegrationUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    connection_type: ConnectionType | None = None
+    base_url: str | None = Field(default=None, max_length=500)
+    external_account_id: str | None = Field(default=None, max_length=200)
+    credentials_ref: str | None = Field(default=None, max_length=500)
+    config: dict | None = None
+    active: bool | None = None
+    status: IntegrationStatus | None = None
+
+
+class POSIntegrationRead(BaseModel):
+    id: int
+    company_id: int
+    location_id: int
+    provider: str
+    name: str
+    connection_type: ConnectionType
+    status: IntegrationStatus
+    base_url: str | None
+    external_account_id: str | None
+    credentials_ref: str | None
+    config: dict | None
+    active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConnectionTestResult(BaseModel):
+    integration_id: int
+    provider: str
+    success: bool
+    message: str
