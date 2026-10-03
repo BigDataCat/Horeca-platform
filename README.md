@@ -126,3 +126,7 @@ VITE_API_URL=http://localhost:8000/api
 - Run Alembic migrations before starting the API.
 - Use HTTPS for API and webhook endpoints.
 - Replace demo/mock connectors with provider-specific implementations.
+
+## Roadmap
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for remaining work, priorities and phases.
