@@ -4,37 +4,70 @@ Integration-first SaaS platform for HoReCa management and intelligence.
 
 The platform is designed to integrate with existing POS systems rather than replace them.
 
-## Current milestone
-
-The first end-to-end module is **Company**:
-
-`React UI → FastAPI API → SQLAlchemy → PostgreSQL`
-
-Implemented operations:
-
-- Create company
-- List companies
-- Read a company by ID
-- Edit company
-- Deactivate company
-- Alembic migration for the initial database model
-
-## Project structure
+## Architecture
 
 ```
-backend/
-  app/
-    api/          # HTTP endpoints
-    core/         # configuration and database connection
-    models/       # SQLAlchemy models
-    schemas/      # Pydantic request/response schemas
-  alembic/        # database migrations
-
-frontend/
-  src/            # React + TypeScript application
-
-docker-compose.yml
+Existing POS
+   │
+   ├── API polling ──┐
+   └── Webhooks ─────┤
+                     ▼
+              POS Connector Layer
+                     ▼
+              Canonical Sales Model
+                     ▼
+        Sales + Product Mapping + UOM
+                     ▼
+             Inventory / Recipes
+                     ▼
+               Product Costing
+                     ▼
+                Dashboard
 ```
+
+## Implemented modules
+
+- Multi-tenant companies and locations
+- JWT authentication and role-based access
+- Product master
+- POS integration management
+- Provider catalog
+- Connector abstraction with demo/mock providers
+- Idempotent sales ingestion
+- Incremental sync cursor/watermark
+- POS sync audit history
+- Product mapping
+- UOM conversion
+- Unmatched product workflow
+- Inventory balances and stock movements
+- Recipe management and automatic recipe consumption
+- Product cost history
+- Recipe cost calculation
+- Operations dashboard
+- POS webhook ingestion with event idempotency
+- Database health check
+- Environment-driven CORS configuration
+
+## API areas
+
+- `/api/auth`
+- `/api/companies`
+- `/api/locations`
+- `/api/users`
+- `/api/products`
+- `/api/integrations/pos`
+- `/api/product-mappings`
+- `/api/sales`
+- `/api/inventory`
+- `/api/recipes`
+- `/api/costs`
+- `/api/dashboard`
+
+## Database migrations
+
+The migration chain currently reaches:
+
+`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012`
 
 ## Run locally
 
@@ -64,13 +97,9 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-API:
+API: `http://localhost:8000`
 
-`http://localhost:8000`
-
-Swagger:
-
-`http://localhost:8000/docs`
+Swagger: `http://localhost:8000/docs`
 
 ### 3. Start the frontend
 
@@ -81,20 +110,19 @@ npm install
 npm run dev
 ```
 
-The frontend expects the API at:
+The frontend expects the API at `http://localhost:8000/api`.
 
-`http://localhost:8000/api`
-
-To override it, create `frontend/.env`:
+Override it with `frontend/.env`:
 
 ```text
 VITE_API_URL=http://localhost:8000/api
 ```
 
-## Next modules
+## Production notes
 
-1. Location management
-2. User and authentication
-3. POS integration layer
-4. Sales/orders ingestion
-5. Analytics and intelligence layer
+- Set a strong `JWT_SECRET_KEY`.
+- Set `CORS_ORIGINS` to the deployed frontend origin(s).
+- Store POS webhook tokens in a proper secret manager before production.
+- Run Alembic migrations before starting the API.
+- Use HTTPS for API and webhook endpoints.
+- Replace demo/mock connectors with provider-specific implementations.
