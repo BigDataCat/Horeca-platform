@@ -34,6 +34,17 @@ type AuthResponse = {
   user: User;
 };
 
+type DashboardSummary = {
+  sales_count: number;
+  revenue: string;
+  tax: string;
+  gross_revenue: string;
+  average_ticket: string;
+  unmatched_products: number;
+  stock_items: number;
+  stock_value: string;
+};
+
 type POSProvider = {
   provider: string;
   display_name: string;
@@ -101,6 +112,7 @@ function App() {
   const [integrations, setIntegrations] = useState<POSIntegration[]>([]);
   const [syncRuns, setSyncRuns] = useState<Record<number, SyncRun[]>>({});
   const [posProviders, setPosProviders] = useState<POSProvider[]>([]);
+  const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [products, setProducts] = useState<{ id: number; name: string; sku: string | null; base_uom: string; active: boolean }[]>([]);
   const [mappings, setMappings] = useState<{ id: number; integration_id: number; external_product_id: string; external_product_name: string | null; product_id: number; match_method: string }[]>([]);
   const [uomConversions, setUomConversions] = useState<{ id: number; product_id: number; from_uom: string; to_uom: string; factor: number }[]>([]);
@@ -256,6 +268,13 @@ function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load locations.");
     }
+  }
+
+  async function loadDashboard() {
+    if (!token) return;
+    const response = await apiFetch("/dashboard/summary", {}, token);
+    if (!response.ok) { setError(await readError(response, "Could not load dashboard.")); return; }
+    setDashboard(await response.json());
   }
 
   async function loadPosProviders() {
@@ -419,6 +438,7 @@ function App() {
       void loadCompanies(token);
       void loadUsers();
       void loadPosProviders();
+      void loadDashboard();
       void loadIntegrations();
       void loadProducts();
       void loadMappings();
@@ -683,6 +703,26 @@ function App() {
       </header>
 
       {error && <p className="error">{error}</p>}
+
+      {dashboard && (
+        <section className="card">
+          <div className="section-heading">
+            <div>
+              <h2>Operations Dashboard</h2>
+              <p className="subtitle">Current company-level operational indicators.</p>
+            </div>
+            <button type="button" className="secondary" onClick={() => void loadDashboard()}>Refresh</button>
+          </div>
+          <div className="dashboard-grid">
+            <div className="metric"><span>Orders</span><strong>{dashboard.sales_count}</strong></div>
+            <div className="metric"><span>Net revenue</span><strong>{dashboard.revenue}</strong></div>
+            <div className="metric"><span>Gross revenue</span><strong>{dashboard.gross_revenue}</strong></div>
+            <div className="metric"><span>Average ticket</span><strong>{dashboard.average_ticket}</strong></div>
+            <div className="metric"><span>Unmatched products</span><strong>{dashboard.unmatched_products}</strong></div>
+            <div className="metric"><span>Stock value</span><strong>{dashboard.stock_value}</strong></div>
+          </div>
+        </section>
+      )}
 
       <section className="card">
         <div className="section-heading">
