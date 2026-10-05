@@ -4,7 +4,7 @@ from app.models.webhook_event import WebhookEvent
 from app.models.audit_log import AuditLog
 from app.models.password_reset import PasswordResetToken
 from app.models.purchasing import GoodsReceipt, GoodsReceiptLine, Supplier
-from app.models.stock_ops import StockCount, StockCountLine, StockTransfer, StockTransferLine
+from app.models.stock_ops import StockCount, StockCountLine, ProductionOrder, StockTransfer, StockTransferLine
 from app.models.company import Company
 from app.models.location import Location
 from app.models.pos_integration import POSIntegration
@@ -17,6 +17,7 @@ from app.models.sync_run import SyncRun
 from app.models.user import User
 
 __all__ = [
+    "ProductionOrder",
     "PasswordResetToken",
     "AuditLog",
     "GoodsReceipt",

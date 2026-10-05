@@ -23,7 +23,7 @@ from app.models.product_uom_conversion import ProductUOMConversion
 from app.models.purchasing import GoodsReceipt, Supplier
 from app.models.recipe import Recipe
 from app.models.sale import Sale
-from app.models.stock_ops import StockCount, StockTransfer
+from app.models.stock_ops import ProductionOrder, StockCount, StockTransfer
 from app.models.user import User
 
 TRACKED = {
@@ -40,6 +40,7 @@ TRACKED = {
     GoodsReceipt: "goods_receipt",
     StockCount: "stock_count",
     StockTransfer: "stock_transfer",
+    ProductionOrder: "production_order",
 }
 # Sales are imported in bulk; only manual status changes (cancel/refund) are interesting.
 UPDATE_ONLY = {Sale: "sale"}

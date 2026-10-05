@@ -58,3 +58,20 @@ class StockTransferLine(Base):
     uom: Mapped[str] = mapped_column(String(20), nullable=False)
 
     transfer: Mapped["StockTransfer"] = relationship(back_populates="lines")
+
+
+class ProductionOrder(TimestampMixin, Base):
+    """Ingredients turned into a stocked semi-finished product using that product's recipe."""
+
+    __tablename__ = "production_orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    location_id: Mapped[int] = mapped_column(ForeignKey("locations.id", ondelete="CASCADE"), nullable=False, index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    uom: Mapped[str] = mapped_column(String(20), nullable=False)
+    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(18, 6))
+    produced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    note: Mapped[str | None] = mapped_column(String(500))
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

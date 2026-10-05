@@ -68,3 +68,25 @@ class StockTransferRead(BaseModel):
     transferred_at: datetime
     note: str | None
     lines: list[TransferLineRead]
+
+
+class ProductionCreate(BaseModel):
+    location_id: int
+    product_id: int
+    quantity: Decimal = Field(gt=0)
+    uom: str = Field(min_length=1, max_length=20)
+    produced_at: datetime | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ProductionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    location_id: int
+    product_id: int
+    quantity: Decimal
+    uom: str
+    unit_cost: Decimal | None
+    produced_at: datetime
+    note: str | None

@@ -22,7 +22,7 @@ connector), a rehearsal of the deployment on real infrastructure, legal document
 | User lifecycle | 🟡 | ✅ change password, admin reset, logout-everywhere, immediate role/deactivation effect. ⛔ e-mail based reset/invites (no e-mail sending yet), refresh tokens. |
 | Inventory operations | ✅ | Suppliers, goods receipts (stock + last-purchase cost), counts, transfers, movements, adjustments with explicit UOM. ⛔ supplier invoices/payments, lot/expiry tracking. |
 | Costing & margins | ✅ | Effective-dated costs, location override, recipe cost, margin / food-cost % report, CSV export. |
-| Recipes | 🟡 | ✅ waste, location override. ⛔ sub-recipes / semi-finished production, modifiers, combo menus. |
+| Recipes | ✅ | Waste, location override, semi-finished production orders (sub-recipes with cost roll-up, cycle protection). Modifiers and combos are handled by sending them as ordinary lines (each with its own mapping/recipe). |
 | Operational UI | ✅ | Sales, inventory, recipes & costs, reports, integrations, alerts, settings (subscription, audit log). Legacy overview page kept. ⛔ i18n (English only), charts, mobile-first layouts. |
 | Alerts | 🟡 | ✅ computed alerts in the UI. ⛔ delivery (e-mail/push). |
 | Observability | 🟡 | ✅ health, JSON logs, `/metrics`. ⛔ tracing, dashboards, alert rules (see `docs/OPERATIONS.md`). |

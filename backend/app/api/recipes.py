@@ -18,6 +18,26 @@ def require_manager(user: User) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner or manager role required")
 
 
+def recipe_cycle(db: Session, company_id: int, product_id: int, ingredient_ids: set[int]) -> bool:
+    """True if using ``ingredient_ids`` in a recipe for ``product_id`` creates a dependency loop."""
+    pending = list(ingredient_ids)
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if current == product_id:
+            return True
+        if current in seen:
+            continue
+        seen.add(current)
+        for line in db.scalars(
+            select(RecipeLine)
+            .join(Recipe, Recipe.id == RecipeLine.recipe_id)
+            .where(Recipe.company_id == company_id, Recipe.active.is_(True), Recipe.product_id == current)
+        ).all():
+            pending.append(line.ingredient_product_id)
+    return False
+
+
 @router.get("", response_model=list[RecipeRead])
 def list_recipes(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> list[Recipe]:
     return list(
@@ -59,6 +79,12 @@ def create_recipe(
     }
     if len(ingredients) != len(ingredient_ids):
         raise HTTPException(status_code=404, detail="One or more ingredient products were not found")
+
+    if recipe_cycle(db, current_user.company_id, payload.product_id, ingredient_ids):
+        raise HTTPException(
+            status_code=400,
+            detail="This recipe would make a product depend on itself (directly or through sub-recipes)",
+        )
 
     recipe = Recipe(
         company_id=current_user.company_id,
