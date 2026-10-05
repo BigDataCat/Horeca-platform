@@ -5,6 +5,29 @@ import { canManage } from "../types";
 import type { Integration, ViewProps } from "../types";
 import { Card, ErrorNote, fmtDate, nameOf, useAction, useAsync } from "../ui";
 
+const HTTP_TEMPLATE = JSON.stringify(
+  {
+    sales_path: "/v1/transactions",
+    cursor_param: "updated_after",
+    page_size_param: "limit",
+    page_size: 100,
+    page_param: "page",
+    items_path: "data.items",
+    auth: { type: "bearer" },
+    amount_divisor: 100,
+    default_currency: "RON",
+    mapping: {
+      external_id: "id",
+      occurred_at: "created_at",
+      currency: "currency",
+      lines_path: "lines",
+      line: { external_product_id: "sku", product_name: "name", quantity: "qty", uom: "unit", unit_price: "price", net_value: "net", tax_value: "tax" },
+    },
+  },
+  null,
+  2,
+);
+
 type Provider = { provider: string; display_name: string; supported_connection_types: string[] };
 type WebhookEvent = { id: number; external_event_id: string; event_type: string; status: string; attempts: number; error_message: string | null; received_at: string };
 type SyncRun = { id: number; started_at: string; status: string; fetched: number; imported: number; skipped_duplicates: number; error_message: string | null; trigger: string };
@@ -16,7 +39,7 @@ export default function IntegrationsView({ api, role, locations, integrations, r
   const action = useAction();
   const [selected, setSelected] = useState<number | null>(null);
   const [token, setToken] = useState<{ id: number; value: string } | null>(null);
-  const [form, setForm] = useState({ location_id: "", provider: "", name: "", interval: "" });
+  const [form, setForm] = useState({ location_id: "", provider: "", name: "", interval: "", base_url: "", credentials_ref: "", config: "" });
 
   const runs = useAsync(() => (selected ? api.get<SyncRun[]>(`/integrations/pos/${selected}/sync-runs`) : Promise.resolve([] as SyncRun[])), [api, selected]);
   const events = useAsync(
@@ -27,8 +50,20 @@ export default function IntegrationsView({ api, role, locations, integrations, r
   async function create(event: FormEvent) {
     event.preventDefault();
     const provider = providers.data?.find((p) => p.provider === form.provider);
+    let config: unknown = null;
+    if (form.provider === "http") {
+      try {
+        config = JSON.parse(form.config);
+      } catch {
+        action.setError("The configuration is not valid JSON.");
+        return;
+      }
+    }
     const ok = await action.run(async () => {
       await api.post("/integrations/pos", {
+        base_url: form.provider === "http" ? form.base_url : null,
+        credentials_ref: form.provider === "http" && form.credentials_ref ? form.credentials_ref : null,
+        config,
         location_id: Number(form.location_id),
         provider: form.provider,
         name: form.name,
@@ -112,6 +147,17 @@ export default function IntegrationsView({ api, role, locations, integrations, r
             <label>{t("Auto-sync (min)")}<input type="number" min="5" max="1440" value={form.interval} onChange={(e) => setForm({ ...form, interval: e.target.value })} placeholder={t("manual")} /></label>
             <button type="submit" disabled={action.busy}>{t("Create")}</button>
           </form>
+          {form.provider === "http" && (
+            <div className="http-config">
+              <p className="subtitle">{t("Generic REST/JSON API: describe the endpoint and how its fields map to a sale. The secret is read from a server environment variable, never stored here.")}</p>
+              <div className="filters">
+                <label>{t("Base URL")}<input value={form.base_url} onChange={(e) => setForm({ ...form, base_url: e.target.value })} placeholder="https://api.example-pos.com" required /></label>
+                <label>{t("Secret reference")}<input value={form.credentials_ref} onChange={(e) => setForm({ ...form, credentials_ref: e.target.value })} placeholder="env:MYPOS_TOKEN" /></label>
+                <button type="button" className="secondary" onClick={() => setForm({ ...form, config: HTTP_TEMPLATE })}>{t("Insert example configuration")}</button>
+              </div>
+              <label>{t("Configuration (JSON)")}<textarea rows={14} value={form.config} onChange={(e) => setForm({ ...form, config: e.target.value })} spellCheck={false} required /></label>
+            </div>
+          )}
         </Card>
       )}
 

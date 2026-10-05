@@ -44,6 +44,9 @@ services:
   backend:
     build: ../backend
     restart: unless-stopped
+    env_file:
+      - path: ./pos-secrets.env   # POS API secrets referenced as env:NAME (optional)
+        required: false
     environment: *backend-env
     depends_on:
       postgres:
@@ -55,6 +58,9 @@ services:
     build: ../backend
     command: ["python", "-m", "app.worker"]
     restart: unless-stopped
+    env_file:
+      - path: ./pos-secrets.env   # POS API secrets referenced as env:NAME (optional)
+        required: false
     environment: *backend-env
     depends_on:
       postgres:

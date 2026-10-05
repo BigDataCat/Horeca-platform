@@ -15,7 +15,7 @@ connector), a rehearsal of the deployment on real infrastructure, legal document
 | Automated tests | ✅ | ~200 backend tests on PostgreSQL (auth, roles, tenant isolation, ingestion, UOM, recipes, inventory, costing, webhooks, sync, CSV, audit, plans, privacy, schema drift) + browser smoke test (`e2e/`). |
 | Reproducible build & CI | ✅ | Pinned frontend deps + lockfile, GitHub Actions (backend tests, frontend build). The workflow was added but has not yet run on GitHub. |
 | Security hardening | 🟡 | ✅ production secret check, hashed webhook tokens, login rate limit, token invalidation, plan/role gaps fixed, audit log, request ids, security headers. ⛔ shared rate-limit store, secret-manager integration (needs the first real connector), dependency/vulnerability scanning in CI. |
-| First real POS connector | 🔒 | Needs a pilot POS and sandbox credentials. `docs/CONNECTORS.md` defines the contract and checklist; CSV import covers any POS that exports files. |
+| First real POS connector | 🟡 | ✅ configurable generic REST/JSON connector (`http`, SSRF-safe, retries, pagination, mapping test) and CSV import. 🔒 Validating against a real vendor API needs a pilot account/sandbox credentials; `docs/CONNECTORS.md` has the contract and checklist. |
 | Background sync | ✅ | Worker, schedules, backoff, auto-pause, stale-run cleanup, SKIP LOCKED claiming. |
 | Webhook resilience | ✅ | Persisted payloads, failed-event list, replay, redelivery retry, hashed tokens, out-of-order cancel events. |
 | Cancellations / returns | ✅ | Full cancel/refund and line-level partial refunds with proportional, exact stock and revenue reversal (API, UI, webhook events for full cancel/refund). |

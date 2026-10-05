@@ -357,4 +357,8 @@ export const ro: Record<string, string> = {
   "transfer_out": "transfer ieșire",
   "warning": "avertisment",
   "yes": "da",
+  "Generic REST/JSON API: describe the endpoint and how its fields map to a sale. The secret is read from a server environment variable, never stored here.": "API REST/JSON generic: descrie endpoint-ul și cum se mapează câmpurile lui pe o vânzare. Secretul este citit dintr-o variabilă de mediu a serverului și nu este stocat aici.",
+  "Secret reference": "Referință secret",
+  "Insert example configuration": "Inserează o configurație exemplu",
+  "Configuration (JSON)": "Configurație (JSON)",
 };

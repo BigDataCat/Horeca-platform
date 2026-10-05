@@ -68,8 +68,23 @@ first thing to do when the first real connector needs it.
 5. Document vendor quirks here (rate limits, time zones, tax model).
 6. Only after it ran stably for a while, start the next vendor.
 
+## Generic REST/JSON connector (`http`)
+Many POS APIs can be connected without code: create an integration with provider **Generic REST/JSON API**,
+set `base_url`, put the secret in a server environment variable and reference it as
+`credentials_ref = "env:MYPOS_TOKEN"` (Docker: add `MYPOS_TOKEN=...` to `deploy/pos-secrets.env`), and describe
+the endpoint in `config` (see the docstring of `backend/app/services/http_connector.py` and the
+example the UI inserts). It supports bearer/header/basic auth, cursor query parameter, page-number or
+page-token pagination, a server-provided next cursor, ISO/epoch timestamps, amounts in minor units
+(`amount_divisor`), retries with backoff on 429/5xx (honours `Retry-After`), and refuses internal
+addresses and plain HTTP (SSRF protection). A record that cannot be mapped fails the whole sync
+loudly instead of guessing, and **Test** maps a real sample record to prove the configuration. Limits: the
+API must return items oldest-first when paginating, only GET JSON endpoints, no cancellation reporting yet.
+Use it as the first real integration when a vendor's REST API is simple enough; write a dedicated
+connector when it is not (OAuth flows, signing, odd pagination).
+
 ## What exists today
 - `demo` and `mock`: deterministic connectors for development and tests.
 - `csv`: any POS that can export sales to CSV (`POST /api/sales/import-csv`). This is the supported path
   until a vendor connector exists.
-- No vendor API connector yet: it needs a pilot account for the chosen POS.
+- `http`: generic REST/JSON pull connector, configurable per integration (tested against mocked APIs only).
+- No vendor-specific connector yet: validating `http` or writing a dedicated one needs a pilot account.

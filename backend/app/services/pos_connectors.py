@@ -129,6 +129,12 @@ PROVIDER_CATALOG: tuple[POSProviderInfo, ...] = (
         capabilities=("sales_pull", "product_mapping", "uom_normalization", "idempotent_sync"),
     ),
     POSProviderInfo(
+        provider="http",
+        display_name="Generic REST/JSON API",
+        supported_connection_types=("api",),
+        capabilities=("sales_pull", "configurable_mapping", "product_mapping", "uom_normalization", "idempotent_sync"),
+    ),
+    POSProviderInfo(
         provider="csv",
         display_name="CSV file import",
         supported_connection_types=("file",),
@@ -144,11 +150,18 @@ PROVIDER_CATALOG: tuple[POSProviderInfo, ...] = (
 
 
 
+def _http_connector() -> POSConnector:
+    from app.services.http_connector import HTTPJSONConnector  # imported lazily: needs httpx
+
+    return HTTPJSONConnector()
+
+
 CONNECTORS: dict[str, POSConnector] = {
     "mock": MockPOSConnector(),
     "demo": DemoPOSConnector(),
     "csv": CSVFileConnector(),
 }
+CONNECTORS["http"] = _http_connector()
 
 
 def list_provider_catalog() -> list[POSProviderInfo]:

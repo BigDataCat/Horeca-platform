@@ -243,6 +243,10 @@ def test_integration(
         integration.status = "error"
         db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception as exc:  # network/vendor outage while testing
+        integration.status = "error"
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Connection test failed: {exc}")
 
     integration.status = "connected" if result.success else "error"
     db.commit()

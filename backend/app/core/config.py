@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     invite_hours: int = 72
     audit_retention_days: int | None = None  # None keeps the audit log forever
     webhook_event_retention_days: int | None = 90
+    http_connector_allow_private: bool = False  # allow loopback/private hosts (development and tests only)
+    http_connector_timeout_seconds: int = 20
     default_plan: str = "business"
     admin_api_key: str | None = None
     metrics_token: str | None = None
