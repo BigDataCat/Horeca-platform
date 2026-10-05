@@ -14,5 +14,6 @@ class Location(TimestampMixin, Base):
     address: Mapped[str | None] = mapped_column(String(300))
     city: Mapped[str | None] = mapped_column(String(100))
     country: Mapped[str] = mapped_column(String(2), nullable=False, default="RO")
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Europe/Bucharest", server_default="Europe/Bucharest")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     company: Mapped["Company"] = relationship(back_populates="locations")

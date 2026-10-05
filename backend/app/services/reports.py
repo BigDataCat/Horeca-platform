@@ -1,10 +1,13 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from datetime import date
+
+from sqlalchemy import Date, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.services.sales_ingestion import ACTIVE_STATUSES
+from app.models.location import Location
 from app.models.product import Product
 from app.models.recipe import Recipe
 from app.models.sale import Sale, SaleLine
@@ -110,3 +113,50 @@ def margin_report(
             }
         )
     return result
+
+
+def daily_sales(
+    db: Session,
+    company_id: int,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    location_id: int | None = None,
+) -> list[dict]:
+    """Sales per local calendar day and location (day boundaries follow each location's time zone).
+
+    ``date_to`` is inclusive. Revenue is net of refunds; cancelled/fully refunded sales are counted
+    separately and excluded from revenue."""
+    local_day = cast(func.timezone(Location.timezone, Sale.occurred_at), Date)
+    active = Sale.status.in_(ACTIVE_STATUSES)
+    query = (
+        select(
+            local_day.label("day"),
+            Sale.location_id,
+            func.count(Sale.id).filter(active).label("sales"),
+            func.count(Sale.id).filter(~active).label("cancelled"),
+            func.coalesce(func.sum(Sale.net_value - Sale.refunded_net_value).filter(active), 0).label("net"),
+            func.coalesce(func.sum(Sale.tax_value - Sale.refunded_tax_value).filter(active), 0).label("tax"),
+        )
+        .join(Location, Location.id == Sale.location_id)
+        .where(Sale.company_id == company_id)
+        .group_by(local_day, Sale.location_id)
+        .order_by(local_day, Sale.location_id)
+    )
+    if location_id is not None:
+        query = query.where(Sale.location_id == location_id)
+    if date_from is not None:
+        query = query.where(local_day >= date_from)
+    if date_to is not None:
+        query = query.where(local_day <= date_to)
+    return [
+        {
+            "date": row.day,
+            "location_id": row.location_id,
+            "sales": row.sales,
+            "cancelled": row.cancelled,
+            "net_revenue": row.net,
+            "tax": row.tax,
+            "average_ticket": (row.net + row.tax) / row.sales if row.sales else Decimal("0"),
+        }
+        for row in db.execute(query).all()
+    ]

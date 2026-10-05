@@ -29,7 +29,7 @@ connector), a rehearsal of the deployment on real infrastructure, legal document
 | Deployment | 🟡 | ✅ prod compose (TLS), migrate-before-start, health checks, non-root image, backup/restore scripts, runbook. ⛔ never executed on a real server (no Docker daemon in the build environment): rehearse on staging. |
 | SaaS | 🟡 | ✅ plans with enforced limits, subscription view, admin support API, company deactivation/deletion. ⛔ payment provider, invoices, self-service plan change, usage-based billing. |
 | Compliance | 🟡 | ✅ tooling for access/erasure, privacy notes (`docs/PRIVACY.md`). ⛔ lawyer-reviewed policy/DPA, audit-log retention job. |
-| Romanian fiscal | ⛔ | VAT is carried from the POS as given. e-Factura, fiscal-register integration and per-location currency/time zone are not implemented. |
+| Romanian fiscal | 🟡 | ✅ per-location time zone (default Europe/Bucharest) with local-day reporting. VAT is carried from the POS as given. ⛔ e-Factura, fiscal-register integration, multi-currency per location. |
 | Multi-POS | ⛔ | By design only after the first connector is stable. |
 
 ## What is needed from people (cannot be done in code)

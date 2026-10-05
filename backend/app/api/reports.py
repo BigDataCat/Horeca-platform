@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Response
@@ -9,7 +9,7 @@ from app.api.common import csv_response
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.services.reports import margin_report
+from app.services.reports import daily_sales, margin_report
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -52,3 +52,26 @@ def margins_csv(
         ["product_id", "product_name", "quantity_sold", "revenue", "cost", "margin", "food_cost_pct"],
         [[r["product_id"], r["product_name"], r["quantity_sold"], r["revenue"], r["cost"], r["margin"], r["food_cost_pct"]] for r in rows],
     )
+
+
+class DailySalesRow(BaseModel):
+    date: date
+    location_id: int
+    sales: int
+    cancelled: int
+    net_revenue: Decimal
+    tax: Decimal
+    average_ticket: Decimal
+
+
+@router.get("/daily-sales", response_model=list[DailySalesRow])
+def daily_sales_report(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    location_id: int | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """Sales per local calendar day and location. ``date_to`` is inclusive; days follow each
+    location's time zone, so a sale at 00:30 local time belongs to the new local day."""
+    return daily_sales(db, current_user.company_id, date_from, date_to, location_id)
