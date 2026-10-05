@@ -141,3 +141,50 @@ def test_metrics_labels_use_parameter_names_not_values(client, tenant_a):
     text = client.get("/metrics").text
     assert 'route="/api/locations/{location_id}"' in text
     assert 'route="unmatched"' in text
+
+
+# ---- subscription expiry
+def set_expiry(company_id, delta_days):
+    from datetime import datetime, timedelta, timezone
+
+    with SessionLocal() as db:
+        db.get(Company, company_id).plan_expires_at = datetime.now(timezone.utc) + timedelta(days=delta_days)
+        db.commit()
+
+
+def test_new_companies_get_a_trial_period_when_configured(client, monkeypatch):
+    monkeypatch.setattr(settings, "trial_days", 14)
+    tenant = bootstrap(client, "Trial Co", "trial@test.dev")
+    sub = client.get("/api/subscription", headers=tenant["headers"]).json()
+    assert sub["expired"] is False and sub["expires_at"] is not None
+
+
+def test_expired_subscription_is_read_only(client, tenant_a):
+    create_location(client, tenant_a)
+    set_expiry(tenant_a["company_id"], -1)
+    assert client.get("/api/locations", headers=tenant_a["headers"]).status_code == 200      # data stays visible
+    assert client.get("/api/sales/export.csv", headers=tenant_a["headers"]).status_code == 200  # and exportable
+    blocked = client.post("/api/products", headers=tenant_a["headers"], json={"name": "X"})
+    assert blocked.status_code == 402 and "expired" in blocked.json()["detail"]
+    assert client.get("/api/subscription", headers=tenant_a["headers"]).json()["expired"] is True
+    # signing in/out and changing the password still work
+    assert client.post("/api/auth/login", json={"email": tenant_a["email"], "password": tenant_a["password"]}).status_code == 200
+    changed = client.post("/api/auth/change-password", headers=tenant_a["headers"], json={"current_password": tenant_a["password"], "new_password": "another-pass-1"})
+    assert changed.status_code == 200
+
+
+def test_future_expiry_does_not_block_and_admin_can_renew(client, tenant_a, monkeypatch):
+    monkeypatch.setattr(settings, "admin_api_key", "admin-secret")
+    admin = {"X-Admin-Key": "admin-secret"}
+    set_expiry(tenant_a["company_id"], 5)
+    assert client.post("/api/products", headers=tenant_a["headers"], json={"name": "OK"}).status_code == 201
+    set_expiry(tenant_a["company_id"], -1)
+    assert client.post("/api/products", headers=tenant_a["headers"], json={"name": "Blocked"}).status_code == 402
+    renewed = client.patch(
+        f"/api/admin/companies/{tenant_a['company_id']}", headers=admin,
+        json={"plan_expires_at": "2999-01-01T00:00:00Z"},
+    )
+    assert renewed.status_code == 200
+    assert client.post("/api/products", headers=tenant_a["headers"], json={"name": "Back"}).status_code == 201
+    cleared = client.patch(f"/api/admin/companies/{tenant_a['company_id']}", headers=admin, json={"clear_expiry": True})
+    assert cleared.json()["plan_expires_at"] is None

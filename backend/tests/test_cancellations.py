@@ -146,3 +146,54 @@ def test_cancel_arriving_before_create_leaves_stock_untouched(client, tenant_a):
     assert stock(client, tenant_a, location, beef) == Decimal("10")
     sale = client.get("/api/sales", headers=tenant_a["headers"]).json()[0]
     assert sale["status"] == "cancelled"
+
+
+def partial(client, integration, event_id, lines, external_id="W1", sale_quantity="4"):
+    return client.post(
+        f"/api/integrations/pos/{integration['id']}/webhook",
+        headers={"X-Webhook-Token": integration["token"]},
+        json={
+            "event_id": event_id,
+            "event_type": "sale.partially_refunded",
+            "sale": sale_payload(external_id, lines=[line("Burger", "BURGER", quantity=sale_quantity)]),
+            "refunded_lines": lines,
+        },
+    )
+
+
+def test_webhook_partial_refund_adjusts_stock_and_is_idempotent_per_event(client, tenant_a):
+    location, integration, beef = setup(client, tenant_a)
+    integration = with_webhook_token(client, tenant_a, integration)
+    webhook(client, integration, "sale.created", "E1", quantity="4")
+    assert stock(client, tenant_a, location, beef) == Decimal("9.2")
+
+    response = partial(client, integration, "E2", [{"external_product_id": "BURGER", "quantity": "1"}])
+    assert response.status_code == 200, response.text
+    assert stock(client, tenant_a, location, beef) == Decimal("9.4")
+    assert client.get("/api/sales", headers=tenant_a["headers"]).json()[0]["status"] == "partially_refunded"
+    # redelivery of the same event id is a duplicate: stock unchanged
+    assert partial(client, integration, "E2", [{"external_product_id": "BURGER", "quantity": "1"}]).json()["duplicate"] is True
+    assert stock(client, tenant_a, location, beef) == Decimal("9.4")
+    # refunding the rest completes it
+    partial(client, integration, "E3", [{"external_product_id": "BURGER", "quantity": "3"}])
+    assert client.get("/api/sales", headers=tenant_a["headers"]).json()[0]["status"] == "refunded"
+    assert stock(client, tenant_a, location, beef) == Decimal("10")
+
+
+def test_webhook_partial_refund_failures_are_stored_for_replay(client, tenant_a):
+    location, integration, beef = setup(client, tenant_a)
+    integration = with_webhook_token(client, tenant_a, integration)
+    # refund arrives before the sale: stored as failed, replayable once the sale exists
+    early = partial(client, integration, "E1", [{"external_product_id": "BURGER", "quantity": "1"}])
+    assert early.status_code == 502
+    webhook(client, integration, "sale.created", "E2", quantity="4")
+    events = client.get(f"/api/integrations/pos/{integration['id']}/webhook-events", headers=tenant_a["headers"], params={"status_filter": "failed"}).json()
+    replay = client.post(f"/api/integrations/pos/{integration['id']}/webhook-events/{events[0]['id']}/replay", headers=tenant_a["headers"])
+    assert replay.status_code == 200 and replay.json()["status"] == "processed"
+    assert stock(client, tenant_a, location, beef) == Decimal("9.4")
+    # asking for more than was sold fails loudly and changes nothing
+    too_many = partial(client, integration, "E3", [{"external_product_id": "BURGER", "quantity": "10"}])
+    assert too_many.status_code == 502
+    assert stock(client, tenant_a, location, beef) == Decimal("9.4")
+    # missing refunded_lines is a failure too
+    assert partial(client, integration, "E4", []).status_code == 502

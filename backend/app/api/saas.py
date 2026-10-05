@@ -1,5 +1,5 @@
 import hmac
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict
@@ -19,14 +19,19 @@ router = APIRouter(tags=["saas"])
 
 class SubscriptionRead(BaseModel):
     plan: str
+    expires_at: datetime | None = None
+    expired: bool = False
     limits: dict[str, int | None]
     usage: dict[str, int]
 
 
 def _subscription(db: Session, company: Company) -> SubscriptionRead:
     plan = get_plan(company.plan)
+    now = datetime.now(timezone.utc)
     return SubscriptionRead(
         plan=plan.name,
+        expires_at=company.plan_expires_at,
+        expired=company.plan_expires_at is not None and company.plan_expires_at < now,
         limits={"locations": plan.max_locations, "users": plan.max_users, "integrations": plan.max_integrations},
         usage=usage(db, company.id),
     )
@@ -53,6 +58,7 @@ class AdminCompanyRead(BaseModel):
     tax_identifier: str | None
     plan: str
     active: bool
+    plan_expires_at: datetime | None = None
     created_at: datetime
     usage: dict[str, int] = {}
 
@@ -60,6 +66,8 @@ class AdminCompanyRead(BaseModel):
 class AdminCompanyUpdate(BaseModel):
     plan: str | None = None
     active: bool | None = None
+    plan_expires_at: datetime | None = None
+    clear_expiry: bool = False
 
 
 def _admin_view(db: Session, company: Company) -> AdminCompanyRead:
@@ -95,6 +103,10 @@ def admin_update_company(company_id: int, payload: AdminCompanyUpdate, db: Sessi
         company.plan = payload.plan
     if payload.active is not None:
         company.active = payload.active
+    if payload.clear_expiry:
+        company.plan_expires_at = None
+    elif payload.plan_expires_at is not None:
+        company.plan_expires_at = payload.plan_expires_at
     db.commit()
     db.refresh(company)
     return _admin_view(db, company)

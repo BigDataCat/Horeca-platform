@@ -23,11 +23,11 @@ connector), a rehearsal of the deployment on real infrastructure, legal document
 | Inventory operations | ✅ | Suppliers, goods receipts (stock + last-purchase cost), counts, transfers, movements, adjustments with explicit UOM. ⛔ supplier invoices/payments, lot/expiry tracking. |
 | Costing & margins | ✅ | Effective-dated costs, location override, recipe cost, margin / food-cost % report, CSV export. |
 | Recipes | ✅ | Waste, location override, semi-finished production orders (sub-recipes with cost roll-up, cycle protection). Modifiers and combos are handled by sending them as ordinary lines (each with its own mapping/recipe). |
-| Operational UI | ✅ | Sales (incl. partial refunds), inventory (incl. production), recipes & costs, reports with daily-sales chart, integrations, alerts, settings (subscription, team invites, time zones, audit log), forgot/reset password. Romanian/English switch (`src/locales/ro.ts`; server error messages, browser prompt dialogs and a few legacy-page strings stay English). Legacy overview page kept. ⛔ mobile-first layouts, more charts. |
+| Operational UI | ✅ | Sales (incl. partial refunds), inventory (incl. production), recipes & costs, reports with daily-sales chart, integrations, alerts, settings (subscription, team invites, time zones, audit log), forgot/reset password. Romanian/English switch (`src/locales/ro.ts`; server error messages, browser prompt dialogs and a few legacy-page strings stay English). Legacy overview page kept. Checked at phone width (390 px): no horizontal overflow on any tab. ⛔ more charts. |
 | Alerts | ✅ | Computed alerts in the UI plus a daily e-mail digest to owners (opt-out per company). ⛔ push notifications, per-user preferences. |
 | Observability | 🟡 | ✅ health, JSON logs, `/metrics`. ⛔ tracing, dashboards, alert rules (see `docs/OPERATIONS.md`). |
 | Deployment | 🟡 | ✅ prod compose (TLS), migrate-before-start, health checks, non-root image, backup/restore scripts, runbook. ⛔ never executed on a real server (no Docker daemon in the build environment): rehearse on staging. |
-| SaaS | 🟡 | ✅ plans with enforced limits, subscription view, admin support API, company deactivation/deletion. ⛔ payment provider, invoices, self-service plan change, usage-based billing. |
+| SaaS | 🟡 | ✅ plans with enforced limits, trial/subscription expiry (read-only after expiry, `TRIAL_DAYS`), subscription view and banner, admin support API (plan, expiry, deactivate, delete). ⛔ payment provider, invoices, self-service plan change, usage-based billing (needs business decisions: prices, VAT, provider). |
 | Compliance | 🟡 | ✅ tooling for access/erasure, privacy notes (`docs/PRIVACY.md`). ⛔ lawyer-reviewed policy/DPA, audit-log retention job. |
 | Romanian fiscal | 🟡 | ✅ per-location time zone (default Europe/Bucharest) with local-day reporting. VAT is carried from the POS as given. ⛔ e-Factura, fiscal-register integration, multi-currency per location. |
 | Multi-POS | ⛔ | By design only after the first connector is stable. |
@@ -45,7 +45,7 @@ connector), a rehearsal of the deployment on real infrastructure, legal document
 3. Choose and configure an SMTP provider (the code is ready: `EMAIL_BACKEND=smtp`).
 4. Shared rate-limit/metrics store before running multiple backend replicas.
 5. Payment provider integration.
-6. Polish driven by the pilot: mobile layout, more charts, partial refund events from POS webhooks.
+6. Polish driven by the pilot: more charts, dedicated screens for audit/retention settings.
 
 ## Development rules (unchanged)
 - Every business feature has an API test; every company-scoped endpoint enforces tenant isolation.

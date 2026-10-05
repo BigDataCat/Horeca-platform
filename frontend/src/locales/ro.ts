@@ -361,4 +361,6 @@ export const ro: Record<string, string> = {
   "Secret reference": "Referință secret",
   "Insert example configuration": "Inserează o configurație exemplu",
   "Configuration (JSON)": "Configurație (JSON)",
+  "Your subscription has expired. The account is read-only until it is renewed.": "Abonamentul a expirat. Contul este doar pentru citire până la reînnoire.",
+  "Your subscription expires on": "Abonamentul expiră la",
 };

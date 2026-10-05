@@ -47,8 +47,10 @@ PROVIDER_CATALOG += (POSProviderInfo("myvendor", "My Vendor", ("api", "webhook")
 Vendors that push events post `{event_id, event_type, sale}` to
 `POST /api/integrations/pos/{id}/webhook` with header `X-Webhook-Token` (generate it with
 `POST /api/integrations/pos/{id}/webhook-token`; only a hash is stored). Event types:
-`sale.created`, `sale.cancelled`, `sale.refunded`. Cancel/refund events may arrive before the create event;
-that is handled. Failed events are stored and can be replayed. If the vendor cannot send custom headers,
+`sale.created`, `sale.cancelled`, `sale.refunded`, `sale.partially_refunded` (the last one also carries
+`refunded_lines: [{external_product_id, quantity}]`; the sale must already exist, otherwise the event is stored as
+failed and can be replayed once it arrives). Cancel/refund events may arrive before the create event; that is
+handled. Failed events are stored and can be replayed. If the vendor cannot send custom headers,
 put a small adapter in front that does.
 
 ### Cancellations and returns when polling

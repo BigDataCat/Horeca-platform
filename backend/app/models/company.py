@@ -16,6 +16,7 @@ class Company(TimestampMixin, Base):
     tax_identifier: Mapped[str | None] = mapped_column(String(50), unique=True)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RON")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    plan_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_alert_digest_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     alert_digest_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=true())
     plan: Mapped[str] = mapped_column(String(30), nullable=False, default="business", server_default="business")

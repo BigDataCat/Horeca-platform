@@ -101,6 +101,8 @@ Several workers can run at once.
   (HTTP 402 when exceeded). New companies get `DEFAULT_PLAN` (default `business`; use `trial` for self-service
   sign-up). `GET /api/subscription` returns plan, limits and usage. There is no payment provider yet:
   plans are changed by platform staff.
+- Set `TRIAL_DAYS` to give new companies a time-limited subscription: after `plan_expires_at` the account is
+  read-only (reads and exports work, writes return 402) until platform staff renew it.
 - Support/admin API, disabled unless `ADMIN_API_KEY` is set: `GET /api/admin/companies` and
   `PATCH /api/admin/companies/{id}` (`plan`, `active`) with header `X-Admin-Key`. Deactivating a company
   signs all its users out.
@@ -119,7 +121,7 @@ account exists and are rate limited.
 
 The migration chain currently reaches:
 
-`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013 → 0014 → 0015 → 0016 → 0017 → 0018 → 0019 → 0020 → 0021 → 0022 → 0023 → 0024 → 0025`
+`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013 → 0014 → 0015 → 0016 → 0017 → 0018 → 0019 → 0020 → 0021 → 0022 → 0023 → 0024 → 0025 → 0026`
 
 ## Run locally
 

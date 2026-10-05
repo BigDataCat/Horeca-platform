@@ -33,3 +33,13 @@ def test_production_rejects_short_secret():
 
 def test_production_accepts_strong_secret():
     assert make(app_env="production", jwt_secret_key="x" * 40).app_env == "production"
+
+
+def test_blank_environment_values_use_defaults(monkeypatch):
+    for name in ("TRIAL_DAYS", "AUDIT_RETENTION_DAYS", "ADMIN_API_KEY", "SMTP_HOST", "SMTP_PORT"):
+        monkeypatch.setenv(name, "")
+    settings = Settings(_env_file=None, database_url=DB)
+    assert settings.trial_days is None
+    assert settings.audit_retention_days is None
+    assert settings.admin_api_key is None
+    assert settings.smtp_port == 587

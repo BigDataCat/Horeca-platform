@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
@@ -36,6 +36,7 @@ def bootstrap_company(payload: BootstrapRequest, db: Session = Depends(get_db)) 
         tax_identifier=payload.tax_identifier,
         currency=payload.currency.upper(),
         plan=settings.default_plan if settings.default_plan in PLANS else "trial",
+        plan_expires_at=(datetime.now(timezone.utc) + timedelta(days=settings.trial_days)) if settings.trial_days else None,
     )
     db.add(company)
     db.flush()

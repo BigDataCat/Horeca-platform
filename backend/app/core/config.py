@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     webhook_event_retention_days: int | None = 90
     http_connector_allow_private: bool = False  # allow loopback/private hosts (development and tests only)
     http_connector_timeout_seconds: int = 20
+    trial_days: int | None = None  # new companies' subscription expires after this many days (None = never)
     default_plan: str = "business"
     admin_api_key: str | None = None
     metrics_token: str | None = None
@@ -56,6 +57,7 @@ class Settings(BaseSettings):
         env_file=ROOT_DIR / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        env_ignore_empty=True,  # a blank value in .env/compose means "use the default"
     )
 
 

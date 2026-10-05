@@ -187,6 +187,7 @@ function App() {
   const [error, setError] = useState("");
   type Tab = "overview" | "sales" | "inventory" | "recipes" | "reports" | "integrations" | "alerts" | "settings";
   const [tab, setTab] = useState<Tab>("overview");
+  const [subscription, setSubscription] = useState<{ plan: string; expires_at: string | null; expired: boolean } | null>(null);
   const api = useMemo(
     () => (token ? createApi(token, () => { localStorage.removeItem(TOKEN_KEY); setToken(null); setCurrentUser(null); }) : null),
     [token],
@@ -630,6 +631,11 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    if (!api) { setSubscription(null); return; }
+    api.get<{ plan: string; expires_at: string | null; expired: boolean }>("/subscription").then(setSubscription).catch(() => setSubscription(null));
+  }, [api, tab]);
+
   if (!token && resetToken) {
     return (
       <ChooseNewPassword
@@ -772,6 +778,13 @@ function App() {
           <button key={key} type="button" className={tab === key ? "active" : "secondary"} onClick={() => setTab(key)}>{t(label)}</button>
         ))}
       </nav>
+
+      {subscription?.expired && (
+        <p className="error" role="alert">{t("Your subscription has expired. The account is read-only until it is renewed.")}</p>
+      )}
+      {subscription && !subscription.expired && subscription.expires_at && new Date(subscription.expires_at).getTime() - Date.now() < 7 * 86400000 && (
+        <p className="notice">{t("Your subscription expires on")} {new Date(subscription.expires_at).toLocaleDateString()}.</p>
+      )}
 
       {error && <p className="error">{error}</p>}
 

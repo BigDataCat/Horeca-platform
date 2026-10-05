@@ -15,6 +15,15 @@ x-backend-env: &backend-env
   DEFAULT_PLAN: ${DEFAULT_PLAN:-trial}
   ADMIN_API_KEY: ${ADMIN_API_KEY:-}
   METRICS_TOKEN: ${METRICS_TOKEN:-}
+  EMAIL_BACKEND: ${EMAIL_BACKEND:-smtp}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-HoReCa Platform <no-reply@localhost>}
+  APP_BASE_URL: https://${DOMAIN}
+  TRIAL_DAYS: ${TRIAL_DAYS:-}
+  AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-}
 
 services:
   postgres:
