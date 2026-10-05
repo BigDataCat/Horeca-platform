@@ -77,6 +77,17 @@ anonymised or synthetic data there, never a raw production dump with personal da
 - `credentials_ref` on integrations is a pointer to a secret store; no connector reads real vendor
   credentials yet (the first real connector must define this: environment variable names or a vault path).
 
+## Invoice intake
+- AI reading needs outbound HTTPS to `api.anthropic.com` and `ANTHROPIC_API_KEY`. A page or photo costs a few cents
+  at the default model (estimate: a few thousand input tokens plus roughly a thousand output tokens per invoice);
+  measure on your own invoices and pick a cheaper `INVOICE_AI_MODEL` if accuracy allows. Without the key, PDF/photo
+  uploads fail with an explanation and XML keeps working.
+- Mailbox: create one mailbox (e.g. `invoices@yourdomain`) that accepts plus-addresses, enable IMAP, and set
+  `IMAP_*` and `INVOICE_INBOX_ADDRESS` on the **worker**. Messages are marked seen after handling; a message that
+  crashed the processor stays unseen and is retried. Check `docker compose logs worker` for `invoice_mail_polled`.
+- A failed or unreadable file is kept (status *failed*) and raises an *info* alert so nothing is silently lost.
+- Always spot-check the first invoices of each supplier before turning on automatic posting.
+
 ## Known limitations
 - Rate limiting and metrics are in-process: with several backend replicas the login limit and counters
   are per replica. Use a shared store (Redis) before scaling out horizontally.

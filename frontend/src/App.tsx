@@ -8,6 +8,7 @@ import RecipesView from "./views/RecipesView";
 import ReportsView from "./views/ReportsView";
 import SalesView from "./views/SalesView";
 import SettingsView from "./views/SettingsView";
+import InvoicesView from "./views/InvoicesView";
 import SalesTrend from "./components/SalesTrend";
 import { ChooseNewPassword, ForgotPassword } from "./views/ResetScreens";
 
@@ -185,7 +186,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  type Tab = "overview" | "sales" | "inventory" | "recipes" | "reports" | "integrations" | "alerts" | "settings";
+  type Tab = "overview" | "sales" | "inventory" | "invoices" | "recipes" | "reports" | "integrations" | "alerts" | "settings";
   const [tab, setTab] = useState<Tab>("overview");
   const [subscription, setSubscription] = useState<{ plan: string; expires_at: string | null; expired: boolean } | null>(null);
   const api = useMemo(
@@ -769,6 +770,7 @@ function App() {
           ["overview", "Overview"],
           ["sales", "Sales"],
           ["inventory", "Inventory"],
+          ["invoices", "Invoices"],
           ["recipes", "Recipes & costs"],
           ["reports", "Reports"],
           ["integrations", "Integrations"],
@@ -1214,6 +1216,7 @@ function App() {
           <>
             {tab === "sales" && <SalesView {...viewProps} />}
             {tab === "inventory" && <InventoryView {...viewProps} />}
+            {tab === "invoices" && <InvoicesView {...viewProps} />}
             {tab === "recipes" && <RecipesView {...viewProps} />}
             {tab === "reports" && <ReportsView {...viewProps} />}
             {tab === "integrations" && <IntegrationsView {...viewProps} />}

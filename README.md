@@ -117,6 +117,23 @@ daily alert digest to owners need an SMTP server: set `EMAIL_BACKEND=smtp`, `SMT
 `console` backend logs the message instead; tests use `memory`. Reset requests never reveal whether an
 account exists and are rate limited.
 
+## Supplier invoices and NIR intake
+
+Open the **Invoices** tab (or `POST /api/invoices/upload`, raw body) and upload a supplier invoice:
+
+- **e-Factura XML or ZIP** (UBL / CIUS-RO) is read exactly. Lines are matched to products by remembered supplier
+  wording, supplier code (SKU) or exact name; units are never guessed (a missing conversion blocks posting until
+  you define it). Credit notes are not posted. Totals that do not add up raise a warning.
+- **PDF and photos** are read by Claude (set `ANTHROPIC_API_KEY`; model `INVOICE_AI_MODEL`, default
+  `claude-opus-5-5`) and are **always reviewed** by a person. The document is treated as untrusted data.
+- Posting creates the goods receipt (stock up, net purchase price becomes the product cost) and remembers the
+  supplier's product names, so the next invoice from them needs no review. Owners can enable automatic posting for
+  exact XML invoices that match completely and reconcile.
+- **E-mail intake:** point a mailbox at the server (`IMAP_HOST`, `IMAP_USER`, `IMAP_PASSWORD`, `IMAP_FOLDER`,
+  `INVOICE_INBOX_ADDRESS=invoices@yourdomain`). Each company gets its own address `invoices+TOKEN@yourdomain`
+  (plus-addressing; the mailbox must deliver those to the same inbox). The worker polls every
+  `INVOICE_POLL_SECONDS` and turns attachments into drafts. Mail with an unknown token is ignored and not stored.
+
 ## Database migrations
 
 The migration chain currently reaches:

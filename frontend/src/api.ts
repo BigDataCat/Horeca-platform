@@ -69,6 +69,9 @@ export function createApi(token: string, onUnauthorized: () => void) {
     async uploadCsv<T>(path: string, text: string): Promise<T> {
       return (await request(path, { method: "POST", body: text }, "text/csv")).json();
     },
+    async uploadBinary<T>(path: string, file: File): Promise<T> {
+      return (await request(path, { method: "POST", body: file }, file.type || "application/octet-stream")).json();
+    },
     async download(path: string, filename: string, params?: Record<string, string | number | boolean | null | undefined>) {
       const response = await request(path + query(params), {}, null);
       const url = URL.createObjectURL(await response.blob());

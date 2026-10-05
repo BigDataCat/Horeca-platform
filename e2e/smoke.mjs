@@ -169,6 +169,31 @@ await step("language switch to Romanian", async () => {
   await page.getByRole("button", { name: "Sales", exact: true }).waitFor();
 });
 
+await step("supplier invoice (e-Factura XML) becomes a goods receipt", async () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>E2E-${Date.now()}</cbc:ID><cbc:IssueDate>2026-10-01</cbc:IssueDate><cbc:DocumentCurrencyCode>RON</cbc:DocumentCurrencyCode>
+  <cac:AccountingSupplierParty><cac:Party><cac:PartyTaxScheme><cbc:CompanyID>RO99887766</cbc:CompanyID></cac:PartyTaxScheme><cac:PartyLegalEntity><cbc:RegistrationName>Furnizor Test SRL</cbc:RegistrationName></cac:PartyLegalEntity></cac:Party></cac:AccountingSupplierParty>
+  <cac:TaxTotal><cbc:TaxAmount>22.50</cbc:TaxAmount></cac:TaxTotal>
+  <cac:LegalMonetaryTotal><cbc:TaxExclusiveAmount>250.00</cbc:TaxExclusiveAmount><cbc:TaxInclusiveAmount>272.50</cbc:TaxInclusiveAmount></cac:LegalMonetaryTotal>
+  <cac:InvoiceLine><cbc:ID>1</cbc:ID><cbc:InvoicedQuantity unitCode="KGM">5</cbc:InvoicedQuantity><cbc:LineExtensionAmount>250.00</cbc:LineExtensionAmount>
+    <cac:Item><cbc:Name>Carne de vita</cbc:Name><cac:SellersItemIdentification><cbc:ID>BEEF</cbc:ID></cac:SellersItemIdentification></cac:Item>
+    <cac:Price><cbc:PriceAmount>50.00</cbc:PriceAmount></cac:Price></cac:InvoiceLine>
+</Invoice>`;
+  fs.writeFileSync("factura.xml", xml);
+  const before = Number((await api("/inventory/stock")).find((s) => s.product_id === beef.id).quantity);
+  await tab("Invoices");
+  await page.locator('input[type=file]').setInputFiles("factura.xml");
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+  await page.getByText("Furnizor Test SRL").first().waitFor();
+  await page.getByRole("button", { name: "Post receipt", exact: true }).click();
+  await page.getByText(/Receipt posted/).waitFor();
+  const after = Number((await api("/inventory/stock")).find((s) => s.product_id === beef.id).quantity);
+  if (Math.abs(after - before - 5) > 1e-6) throw new Error(`expected +5 kg, got ${after - before}`);
+  const costs = await api("/costs/products");
+  if (!costs.some((c) => Number(c.unit_cost) === 50)) throw new Error("purchase cost 50 not recorded");
+});
+
 await step("settings: subscription + audit + password", async () => {
   await tab("Settings");
   await page.getByText("Current plan: business").waitFor();
