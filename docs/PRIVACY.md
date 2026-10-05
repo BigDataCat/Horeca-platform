@@ -33,8 +33,9 @@ No payment card data is processed. No third-party analytics or tracking scripts 
 ## Retention (decisions to take; defaults today)
 - Business data (sales, stock, costs): kept until the customer deletes the company. Tax law may require
   customers to keep accounting records for years; do not auto-delete without their instruction.
-- Audit log: kept indefinitely (no purge job yet). Decide a retention period (e.g. 2–5 years) and add a
-  scheduled purge before it grows large.
+- Audit log: kept indefinitely unless `AUDIT_RETENTION_DAYS` is set; the worker then purges older entries daily.
+  Decide a period (e.g. 2–5 years). Finished webhook events are purged after `WEBHOOK_EVENT_RETENTION_DAYS`
+  (default 90); failed ones are kept until replayed. Used/expired reset tokens are purged daily.
 - Application logs: set the log store retention (suggest 30–90 days).
 - Backups: 14 days by default (`KEEP_DAYS`).
 
@@ -46,5 +47,5 @@ role-based access (owner/manager/employee), security headers and CSP on the fron
 
 ## Open items before launch
 Privacy policy and DPA text; cookie/consent review (the app uses `localStorage` for the session token only);
-retention schedule and purge job for the audit log; breach notification procedure; sub-processor list
+the chosen retention periods; breach notification procedure; sub-processor list
 (hosting, backups, e-mail provider once added); data location (choose an EU region).

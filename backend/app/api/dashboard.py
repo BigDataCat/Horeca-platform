@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.services.sales_ingestion import ACTIVE_STATUSES
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.inventory import ProductStock
@@ -23,16 +24,16 @@ def dashboard_summary(
     sales = db.execute(
         select(
             func.count(Sale.id),
-            func.coalesce(func.sum(Sale.net_value), 0),
-            func.coalesce(func.sum(Sale.tax_value), 0),
-            func.coalesce(func.sum(Sale.gross_value), 0),
-        ).where(Sale.company_id == current_user.company_id, Sale.status == "completed")
+            func.coalesce(func.sum(Sale.net_value - Sale.refunded_net_value), 0),
+            func.coalesce(func.sum(Sale.tax_value - Sale.refunded_tax_value), 0),
+            func.coalesce(func.sum(Sale.gross_value - Sale.refunded_net_value - Sale.refunded_tax_value), 0),
+        ).where(Sale.company_id == current_user.company_id, Sale.status.in_(ACTIVE_STATUSES))
     ).one()
 
     cancelled_sales = int(
         db.scalar(
             select(func.count(Sale.id)).where(
-                Sale.company_id == current_user.company_id, Sale.status != "completed"
+                Sale.company_id == current_user.company_id, Sale.status.not_in(ACTIVE_STATUSES)
             )
         )
         or 0
@@ -49,7 +50,7 @@ def dashboard_summary(
             .join(Sale, Sale.id == SaleLine.sale_id)
             .where(
                 Sale.company_id == current_user.company_id,
-                Sale.status == "completed",
+                Sale.status.in_(ACTIVE_STATUSES),
                 SaleLine.product_id.is_(None),
                 SaleLine.external_product_id.is_not(None),
             )

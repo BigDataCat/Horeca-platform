@@ -54,6 +54,8 @@ class SaleLineRead(BaseModel):
     unit_price: Decimal
     net_value: Decimal
     tax_value: Decimal
+    refunded_quantity: Decimal = Decimal("0")
+    refunded_net_value: Decimal = Decimal("0")
 
     model_config = {"from_attributes": True}
 
@@ -71,6 +73,8 @@ class SaleRead(BaseModel):
     gross_value: Decimal
     status: str
     status_reason: str | None = None
+    refunded_net_value: Decimal = Decimal("0")
+    refunded_tax_value: Decimal = Decimal("0")
     lines: list[SaleLineRead]
 
     model_config = {"from_attributes": True}
@@ -78,4 +82,14 @@ class SaleRead(BaseModel):
 
 class SaleStatusChange(BaseModel):
     status: Literal["cancelled", "refunded"]
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class RefundLine(BaseModel):
+    line_id: int
+    quantity: Decimal = Field(gt=0)
+
+
+class SaleRefundRequest(BaseModel):
+    lines: list[RefundLine] = Field(min_length=1)
     reason: str | None = Field(default=None, max_length=500)

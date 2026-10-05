@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.services.sales_ingestion import ACTIVE_STATUSES
 from app.models.inventory import ProductStock
 from app.models.pos_integration import POSIntegration
 from app.models.product import Product
@@ -62,7 +63,7 @@ def compute_alerts(db: Session, company_id: int) -> list[dict]:
         .join(Sale, Sale.id == SaleLine.sale_id)
         .where(
             Sale.company_id == company_id,
-            Sale.status == "completed",
+            Sale.status.in_(ACTIVE_STATUSES),
             SaleLine.product_id.is_(None),
             SaleLine.external_product_id.is_not(None),
         )

@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     app_base_url: str = "http://localhost:5173"
     password_reset_minutes: int = 60
     invite_hours: int = 72
+    audit_retention_days: int | None = None  # None keeps the audit log forever
+    webhook_event_retention_days: int | None = 90
     default_plan: str = "business"
     admin_api_key: str | None = None
     metrics_token: str | None = None

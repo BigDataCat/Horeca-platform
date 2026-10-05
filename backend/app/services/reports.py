@@ -4,6 +4,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.services.sales_ingestion import ACTIVE_STATUSES
 from app.models.product import Product
 from app.models.recipe import Recipe
 from app.models.sale import Sale, SaleLine
@@ -56,13 +57,13 @@ def margin_report(
         select(
             SaleLine.product_id,
             Sale.location_id,
-            func.sum(SaleLine.quantity).label("quantity"),
-            func.sum(SaleLine.net_value).label("revenue"),
+            func.sum(SaleLine.quantity - SaleLine.refunded_quantity).label("quantity"),
+            func.sum(SaleLine.net_value - SaleLine.refunded_net_value).label("revenue"),
         )
         .join(Sale, Sale.id == SaleLine.sale_id)
         .where(
             Sale.company_id == company_id,
-            Sale.status == "completed",
+            Sale.status.in_(ACTIVE_STATUSES),
             SaleLine.product_id.is_not(None),
         )
         .group_by(SaleLine.product_id, Sale.location_id)

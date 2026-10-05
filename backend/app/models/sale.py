@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -43,6 +43,8 @@ class Sale(TimestampMixin, Base):
     gross_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     source_payload: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="completed", server_default="completed")
+    refunded_net_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
+    refunded_tax_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
     status_reason: Mapped[str | None] = mapped_column(String(500))
     status_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -75,6 +77,9 @@ class SaleLine(Base):
     unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
     net_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     tax_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+    refunded_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False, default=0, server_default=text("0"))
+    refunded_net_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
+    refunded_tax_value: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0, server_default=text("0"))
 
     sale: Mapped["Sale"] = relationship(back_populates="lines")
     product: Mapped["Product | None"] = relationship()

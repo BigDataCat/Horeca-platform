@@ -12,6 +12,7 @@ from app.models.sale import Sale, SaleLine
 from app.models.company import Company
 from app.models.user import User
 from app.schemas.sales import (
+    SaleRefundRequest,
     SaleStatusChange,
     SaleRead,
     SalesImportRequest,
@@ -19,7 +20,7 @@ from app.schemas.sales import (
     UnmatchedProductRead,
 )
 from app.services.csv_sales import CSVImportError, parse_csv_sales
-from app.services.sales_ingestion import change_sale_status, import_sale
+from app.services.sales_ingestion import ACTIVE_STATUSES, RefundError, change_sale_status, import_sale, refund_sale_lines
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
@@ -128,6 +129,27 @@ def change_status(
     return db.scalar(select(Sale).options(selectinload(Sale.lines)).where(Sale.id == sale.id))
 
 
+@router.post("/{sale_id}/refund-lines", response_model=SaleRead)
+def refund_lines(
+    sale_id: int,
+    payload: SaleRefundRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Sale:
+    """Refund part of a sale (per line and quantity). Revenue and ingredient stock are reversed proportionally."""
+    require_manager(current_user)
+    sale = db.scalar(select(Sale).options(selectinload(Sale.lines)).where(Sale.id == sale_id))
+    if sale is None or sale.company_id != current_user.company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale not found")
+    try:
+        refund_sale_lines(db, sale, [(l.line_id, l.quantity) for l in payload.lines], payload.reason)
+    except RefundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT if "already" in str(exc) else status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    db.commit()
+    return db.scalar(select(Sale).options(selectinload(Sale.lines)).where(Sale.id == sale.id))
+
+
 @router.get("/unmatched-products", response_model=list[UnmatchedProductRead])
 def list_unmatched_products(
     current_user: User = Depends(get_current_user),
@@ -145,7 +167,7 @@ def list_unmatched_products(
         .join(Sale, Sale.id == SaleLine.sale_id)
         .where(
             Sale.company_id == current_user.company_id,
-            Sale.status == "completed",
+            Sale.status.in_(ACTIVE_STATUSES),
             SaleLine.product_id.is_(None),
             Sale.integration_id.is_not(None),
             SaleLine.external_product_id.is_not(None),
