@@ -18,13 +18,13 @@ connector), a rehearsal of the deployment on real infrastructure, legal document
 | First real POS connector | 🔒 | Needs a pilot POS and sandbox credentials. `docs/CONNECTORS.md` defines the contract and checklist; CSV import covers any POS that exports files. |
 | Background sync | ✅ | Worker, schedules, backoff, auto-pause, stale-run cleanup, SKIP LOCKED claiming. |
 | Webhook resilience | ✅ | Persisted payloads, failed-event list, replay, redelivery retry, hashed tokens, out-of-order cancel events. |
-| Cancellations / returns | ✅ | Full-sale cancel/refund with exact stock reversal (API + webhook events). Partial refunds ⛔. |
-| User lifecycle | 🟡 | ✅ change password, admin reset, logout-everywhere, immediate role/deactivation effect. ⛔ e-mail based reset/invites (no e-mail sending yet), refresh tokens. |
+| Cancellations / returns | ✅ | Full cancel/refund and line-level partial refunds with proportional, exact stock and revenue reversal (API, UI, webhook events for full cancel/refund). |
+| User lifecycle | ✅ | Change password, e-mail reset, e-mail invitations, admin reset, logout-everywhere, immediate role/deactivation effect. ⛔ refresh tokens, e-mail address change flow. |
 | Inventory operations | ✅ | Suppliers, goods receipts (stock + last-purchase cost), counts, transfers, movements, adjustments with explicit UOM. ⛔ supplier invoices/payments, lot/expiry tracking. |
 | Costing & margins | ✅ | Effective-dated costs, location override, recipe cost, margin / food-cost % report, CSV export. |
 | Recipes | ✅ | Waste, location override, semi-finished production orders (sub-recipes with cost roll-up, cycle protection). Modifiers and combos are handled by sending them as ordinary lines (each with its own mapping/recipe). |
-| Operational UI | ✅ | Sales, inventory, recipes & costs, reports, integrations, alerts, settings (subscription, audit log). Legacy overview page kept. ⛔ i18n (English only), charts, mobile-first layouts. |
-| Alerts | 🟡 | ✅ computed alerts in the UI. ⛔ delivery (e-mail/push). |
+| Operational UI | ✅ | Sales (incl. partial refunds), inventory (incl. production), recipes & costs, reports with daily-sales chart, integrations, alerts, settings (subscription, team invites, time zones, audit log), forgot/reset password. Romanian/English switch (`src/locales/ro.ts`; server error messages, browser prompt dialogs and a few legacy-page strings stay English). Legacy overview page kept. ⛔ mobile-first layouts, more charts. |
+| Alerts | ✅ | Computed alerts in the UI plus a daily e-mail digest to owners (opt-out per company). ⛔ push notifications, per-user preferences. |
 | Observability | 🟡 | ✅ health, JSON logs, `/metrics`. ⛔ tracing, dashboards, alert rules (see `docs/OPERATIONS.md`). |
 | Deployment | 🟡 | ✅ prod compose (TLS), migrate-before-start, health checks, non-root image, backup/restore scripts, runbook. ⛔ never executed on a real server (no Docker daemon in the build environment): rehearse on staging. |
 | SaaS | 🟡 | ✅ plans with enforced limits, subscription view, admin support API, company deactivation/deletion. ⛔ payment provider, invoices, self-service plan change, usage-based billing. |
@@ -42,10 +42,10 @@ connector), a rehearsal of the deployment on real infrastructure, legal document
 ## Suggested next engineering work (in order)
 1. Run CI on GitHub and fix anything environment-specific; add dependency/vulnerability scanning.
 2. First vendor connector once access exists (include status-change reporting for polling connectors).
-3. E-mail sending (password reset, invites, alert delivery) with a provider chosen by the operator.
-4. Sub-recipes / semi-finished products and modifiers, driven by the pilot's actual menu.
-5. Shared rate-limit/metrics store before running multiple backend replicas.
-6. Payment provider integration; i18n (RO/EN); audit-log purge job.
+3. Choose and configure an SMTP provider (the code is ready: `EMAIL_BACKEND=smtp`).
+4. Shared rate-limit/metrics store before running multiple backend replicas.
+5. Payment provider integration.
+6. Polish driven by the pilot: mobile layout, more charts, partial refund events from POS webhooks.
 
 ## Development rules (unchanged)
 - Every business feature has an API test; every company-scoped endpoint enforces tenant isolation.

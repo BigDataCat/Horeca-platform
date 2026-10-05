@@ -179,3 +179,26 @@ code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; word-break: br
   .csv-form, .adjust-form, .cost-form, .integration-form, .line-row { grid-template-columns: 1fr; }
   main { padding: 24px 12px 60px; }
 }
+
+/* Trend chart: one series, one hue, recessive grid */
+.trend { margin: 16px 0; }
+.trend-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.trend-readout { color: #374151; font-size: 14px; min-height: 1.2em; }
+.trend { max-width: 860px; }
+.trend svg { width: 100%; height: auto; }
+.trend-grid { stroke: #e5e7eb; stroke-width: 1; }
+.trend-axis { fill: #6b7280; font-size: 11px; }
+.trend-bar { fill: #2563eb; }
+.trend-bar.active { fill: #1d4ed8; }
+.trend g:focus { outline: none; }
+.trend g:focus-visible .trend-bar { stroke: #111827; stroke-width: 2; }
+.badge.partially_refunded { background: #fef3c7; color: #92400e; }
+.checkbox { display: flex; gap: 8px; align-items: center; font-weight: 500; margin-top: 12px; } .checkbox input { min-height: auto; }
+.link-button { background: none; color: #2563eb; min-height: auto; padding: 4px 0; margin-bottom: 12px; text-decoration: underline; }
+.lang-switch { display: flex; gap: 4px; }
+.lang-switch button { min-height: 32px; padding: 0 10px; }
+.lang-switch button.active { background: #111827; color: #fff; }
+
+.metric { min-width: 0; justify-content: space-between; }
+.metric span { line-height: 1.3; }
+.metric strong { overflow-wrap: anywhere; }

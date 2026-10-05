@@ -8,7 +8,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const problems = [];
 page.on("console", (m) => { if (m.type() === "error") problems.push("console: " + m.text()); });
 page.on("pageerror", (e) => problems.push("pageerror: " + e.message));
-page.on("dialog", (d) => d.accept("test reason"));
+page.on("dialog", (d) => d.accept(d.message().includes("Quantity of") ? "2" : "test reason"));
 
 const step = async (name, fn) => { try { await fn(); console.log("OK  ", name); } catch (e) { console.log("FAIL", name, "-", e.message.split("\n")[0]); problems.push(name); await page.screenshot({ path: `fail-${name.replace(/\W+/g, "_")}.png`, fullPage: true }); } };
 const tab = (label) => page.getByRole("button", { name: label, exact: true }).first().click();
@@ -76,7 +76,8 @@ await step("create csv integration", async () => {
 
 await step("import csv and see sale", async () => {
   await tab("Sales");
-  const csv = "sale_id,occurred_at,external_product_id,product_name,quantity,unit_price,tax_value\nT1,2026-10-01T10:00:00Z,BURGER,Burger,10,10,1.9\nT2,2026-10-01T11:00:00Z,XYZ,Mystery,1,5,0\n";
+  const now = new Date().toISOString();
+  const csv = `sale_id,occurred_at,external_product_id,product_name,quantity,unit_price,tax_value\nT1,${now},BURGER,Burger,10,10,1.9\nT2,${now},XYZ,Mystery,1,5,0\n`;
   fs.writeFileSync("sales.csv", csv);
   await page.locator(".csv-form select").selectOption({ label: "Export import" });
   await page.locator('input[type=file]').setInputFiles("sales.csv");
@@ -123,10 +124,49 @@ await step("reports", async () => {
     const h = { "Content-Type": "application/json", Authorization: "Bearer " + token };
     const ints = await (await fetch(API + "/integrations/pos", { headers: h })).json();
     await fetch(API + "/sales/import-csv?integration_id=" + ints[0].id, { method: "POST", headers: { ...h, "Content-Type": "text/csv" },
-      body: "sale_id,occurred_at,external_product_id,product_name,quantity,unit_price\nT3,2026-10-02T10:00:00Z,BURGER,Burger,10,10\n" });
+      body: "sale_id,occurred_at,external_product_id,product_name,quantity,unit_price\nT3," + new Date().toISOString() + ",BURGER,Burger,10,10\n" });
   }, [API]);
   await tab("Reports");
   await page.getByRole("cell", { name: "Burger" }).waitFor();
+});
+
+await step("partial refund restores part of the stock", async () => {
+  await tab("Sales");
+  await page.getByRole("cell", { name: "T3", exact: true }).click();
+  const before = Number((await api("/inventory/stock")).find((s) => s.product_id === beef.id).quantity);
+  await page.getByRole("row", { name: /Burger/ }).getByRole("button", { name: "Refund", exact: true }).click();
+  await page.getByText(/Refund recorded/).waitFor();
+  const after = Number((await api("/inventory/stock")).find((s) => s.product_id === beef.id).quantity);
+  if (Math.abs(after - before - 0.44) > 1e-6) throw new Error(`expected +0.44 kg (2 burgers, 10% waste), got ${after - before}`);
+  await page.getByText("partially_refunded").first().waitFor();
+});
+
+await step("production consumes ingredients", async () => {
+  const sauce = await api("/products", "POST", { name: "Sauce", base_uom: "KG" });
+  await api("/recipes", "POST", { product_id: sauce.id, name: "Sauce", lines: [{ ingredient_product_id: beef.id, quantity: "0.5", uom: "KG" }] });
+  await page.reload();
+  await page.getByText("Signed in as Ana Pop").waitFor();
+  await tab("Inventory");
+  await tab("Production");
+  await page.locator(".adjust-form select").nth(0).selectOption({ label: "Main" });
+  await page.locator(".adjust-form select").nth(1).selectOption({ label: "Sauce (KG)" });
+  await page.locator(".adjust-form input").nth(0).fill("1");
+  await page.getByRole("button", { name: "Produce", exact: true }).click();
+  await page.getByText(/Batch produced/).waitFor();
+});
+
+await step("trend chart on overview", async () => {
+  await tab("Overview");
+  await page.getByRole("img", { name: /Net revenue, last 14 days/ }).waitFor();
+});
+
+await step("language switch to Romanian", async () => {
+  await page.getByRole("button", { name: "RO", exact: true }).click();
+  await page.getByRole("button", { name: "Vânzări", exact: true }).waitFor();
+  await tab("Vânzări");
+  await page.getByRole("heading", { name: "Vânzări", exact: true }).waitFor();
+  await page.getByRole("button", { name: "EN", exact: true }).click();
+  await page.getByRole("button", { name: "Sales", exact: true }).waitFor();
 });
 
 await step("settings: subscription + audit + password", async () => {
@@ -142,6 +182,13 @@ await step("settings: subscription + audit + password", async () => {
 await step("sign out everywhere", async () => {
   await page.getByRole("button", { name: "Sign out on all devices" }).click();
   await page.getByRole("heading", { name: "Sign in" }).waitFor();
+});
+
+await step("forgot password screen", async () => {
+  await page.getByRole("button", { name: "Forgot your password?" }).click();
+  await page.getByLabel("Email").fill("someone@e2e.dev");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+  await page.getByText(/If an account exists/).waitFor();
 });
 
 await page.screenshot({ path: "final.png" });

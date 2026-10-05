@@ -1,3 +1,4 @@
+import { LanguageSwitch, useT } from "./i18n";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createApi } from "./api";
 import AlertsView from "./views/AlertsView";
@@ -7,6 +8,8 @@ import RecipesView from "./views/RecipesView";
 import ReportsView from "./views/ReportsView";
 import SalesView from "./views/SalesView";
 import SettingsView from "./views/SettingsView";
+import SalesTrend from "./components/SalesTrend";
+import { ChooseNewPassword, ForgotPassword } from "./views/ResetScreens";
 
 type Company = {
   id: number;
@@ -111,10 +114,12 @@ async function apiFetch(path: string, options: RequestInit = {}, token?: string)
 }
 
 function App() {
+  const t = useT();
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const [authMode, setAuthMode] = useState<"login" | "bootstrap">("login");
+  const [authMode, setAuthMode] = useState<"login" | "bootstrap" | "forgot">("login");
+  const [resetToken, setResetToken] = useState<string | null>(() => new URLSearchParams(window.location.search).get("reset_token"));
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [registerCompanyId, setRegisterCompanyId] = useState("");
@@ -625,11 +630,26 @@ function App() {
     }
   }
 
+  if (!token && resetToken) {
+    return (
+      <ChooseNewPassword
+        token={resetToken}
+        onBack={() => { window.history.replaceState({}, "", window.location.pathname); setResetToken(null); }}
+        onDone={(accessToken) => { localStorage.setItem(TOKEN_KEY, accessToken); setResetToken(null); setToken(accessToken); }}
+      />
+    );
+  }
+
+  if (!token && authMode === "forgot") {
+    return <ForgotPassword onBack={() => setAuthMode("login")} />;
+  }
+
   if (!token || !currentUser) {
     return (
       <main className="auth-page">
         <section className="card auth-card">
-          <p className="eyebrow">HoReCa Management Platform</p>
+          <LanguageSwitch />
+          <p className="eyebrow">{t("HoReCa Management Platform")}</p>
           <h1>{authMode === "login" ? "Sign in" : "Create your HoReCa company"}</h1>
 
           <form onSubmit={handleAuth} className="auth-form">
@@ -702,6 +722,10 @@ function App() {
             </button>
           </form>
 
+          {authMode === "login" && (
+            <button type="button" className="link-button" onClick={() => setAuthMode("forgot")}>{t("Forgot your password?")}</button>
+          )}
+
           <button
             type="button"
             className="secondary full-width"
@@ -725,15 +749,13 @@ function App() {
     <main>
       <header className="topbar">
         <div>
-          <p className="eyebrow">HoReCa Management Platform</p>
-          <h1>Company Management</h1>
+          <p className="eyebrow">{t("HoReCa Management Platform")}</p>
+          <h1>{t("Company Management")}</h1>
           <p className="subtitle">
             Signed in as {currentUser.first_name} {currentUser.last_name} · {currentUser.role}
           </p>
         </div>
-        <button type="button" className="secondary" onClick={logout}>
-          Sign out
-        </button>
+        <div className="actions"><LanguageSwitch /><button type="button" className="secondary" onClick={logout}> {t("Sign out")} </button></div>
       </header>
 
       <nav className="tabs">
@@ -747,7 +769,7 @@ function App() {
           ["alerts", "Alerts"],
           ["settings", "Settings"],
         ] as [Tab, string][]).map(([key, label]) => (
-          <button key={key} type="button" className={tab === key ? "active" : "secondary"} onClick={() => setTab(key)}>{label}</button>
+          <button key={key} type="button" className={tab === key ? "active" : "secondary"} onClick={() => setTab(key)}>{t(label)}</button>
         ))}
       </nav>
 
@@ -759,33 +781,34 @@ function App() {
         <section className="card">
           <div className="section-heading">
             <div>
-              <h2>Operations Dashboard</h2>
-              <p className="subtitle">Current company-level operational indicators.</p>
+              <h2>{t("Operations Dashboard")}</h2>
+              <p className="subtitle">{t("Current company-level operational indicators.")}</p>
             </div>
-            <button type="button" className="secondary" onClick={() => void loadDashboard()}>Refresh</button>
+            <button type="button" className="secondary" onClick={() => void loadDashboard()}>{t("Refresh")}</button>
           </div>
           <div className="dashboard-grid">
-            <div className="metric"><span>Orders</span><strong>{dashboard.sales_count}</strong></div>
-            <div className="metric"><span>Net revenue</span><strong>{dashboard.revenue}</strong></div>
-            <div className="metric"><span>Gross revenue</span><strong>{dashboard.gross_revenue}</strong></div>
-            <div className="metric"><span>Average ticket</span><strong>{dashboard.average_ticket}</strong></div>
-            <div className="metric"><span>Unmatched products</span><strong>{dashboard.unmatched_products}</strong></div>
-            <div className="metric"><span>Stock value</span><strong>{dashboard.stock_value}</strong></div>
+            <div className="metric"><span>{t("Orders")}</span><strong>{dashboard.sales_count}</strong></div>
+            <div className="metric"><span>{t("Net revenue")}</span><strong>{Number(dashboard.revenue).toFixed(2)}</strong></div>
+            <div className="metric"><span>{t("Gross revenue")}</span><strong>{Number(dashboard.gross_revenue).toFixed(2)}</strong></div>
+            <div className="metric"><span>{t("Average ticket")}</span><strong>{Number(dashboard.average_ticket).toFixed(2)}</strong></div>
+            <div className="metric"><span>{t("Unmatched products")}</span><strong>{dashboard.unmatched_products}</strong></div>
+            <div className="metric"><span>{t("Stock value")}</span><strong>{Number(dashboard.stock_value).toFixed(2)}</strong></div>
           </div>
+          {api && <SalesTrend api={api} title="Net revenue, last 14 days" />}
         </section>
       )}
 
       <section className="card">
         <div className="section-heading">
-          <h2>Companies</h2>
-          <button type="button" className="secondary" onClick={() => void loadCompanies()}>Refresh</button>
+          <h2>{t("Companies")}</h2>
+          <button type="button" className="secondary" onClick={() => void loadCompanies()}>{t("Refresh")}</button>
         </div>
 
-        {loading ? <p>Loading...</p> : (
+        {loading ? <p>{t("Loading...")}</p> : (
           <div className="table-wrapper">
             <table>
               <thead>
-                <tr><th>Name</th><th>Tax ID</th><th>Currency</th><th>Status</th></tr>
+                <tr><th>{t("Name")}</th><th>{t("Tax ID")}</th><th>{t("Currency")}</th><th>{t("Status")}</th></tr>
               </thead>
               <tbody>
                 {companies.map((company) => (
@@ -809,7 +832,7 @@ function App() {
       <section className="card">
         <div className="section-heading">
           <div>
-            <h2>Locations</h2>
+            <h2>{t("Locations")}</h2>
             <p className="subtitle">
               {selectedCompanyId === null
                 ? "Select a company first."
@@ -817,9 +840,7 @@ function App() {
             </p>
           </div>
           {selectedCompanyId !== null && (
-            <button type="button" className="secondary" onClick={() => void loadLocations(selectedCompanyId)}>
-              Refresh
-            </button>
+            <button type="button" className="secondary" onClick={() => void loadLocations(selectedCompanyId)}>{t("Refresh")}</button>
           )}
         </div>
 
@@ -853,9 +874,7 @@ function App() {
                     setAddress("");
                     setCity("");
                     setCountry("RO");
-                  }}>
-                    Cancel
-                  </button>
+                  }}>{t("Cancel")}</button>
                 )}
               </div>
             </form>
@@ -864,7 +883,7 @@ function App() {
               <div className="table-wrapper">
                 <table>
                   <thead>
-                    <tr><th>Name</th><th>Address</th><th>City</th><th>Country</th><th>Status</th><th /></tr>
+                    <tr><th>{t("Name")}</th><th>{t("Address")}</th><th>{t("City")}</th><th>{t("Country")}</th><th>{t("Status")}</th><th /></tr>
                   </thead>
                   <tbody>
                     {locations.map((location) => (
@@ -883,10 +902,8 @@ function App() {
                                 setAddress(location.address ?? "");
                                 setCity(location.city ?? "");
                                 setCountry(location.country);
-                              }}>Edit</button>
-                              <button type="button" className="danger" onClick={() => void deactivateLocation(location.id)}>
-                                Deactivate
-                              </button>
+                              }}>{t("Edit")}</button>
+                              <button type="button" className="danger" onClick={() => void deactivateLocation(location.id)}>{t("Deactivate")}</button>
                             </>
                           )}
                         </td>
@@ -903,10 +920,10 @@ function App() {
       <section className="card">
         <div className="section-heading">
           <div>
-            <h2>Users</h2>
-            <p className="subtitle">Users belonging to your company.</p>
+            <h2>{t("Users")}</h2>
+            <p className="subtitle">{t("Users belonging to your company.")}</p>
           </div>
-          <button type="button" className="secondary" onClick={() => void loadUsers()}>Refresh</button>
+          <button type="button" className="secondary" onClick={() => void loadUsers()}>{t("Refresh")}</button>
         </div>
 
         {(currentUser.role === "owner" || currentUser.role === "manager") && (
@@ -930,19 +947,19 @@ function App() {
             <label>
               Role
               <select value={newUserRole} onChange={(event) => setNewUserRole(event.target.value as User["role"])}>
-                <option value="employee">Employee</option>
-                <option value="manager">Manager</option>
-                <option value="owner">Owner</option>
+                <option value="employee">{t("Employee")}</option>
+                <option value="manager">{t("Manager")}</option>
+                <option value="owner">{t("Owner")}</option>
               </select>
             </label>
-            <button type="submit" disabled={saving}>Create user</button>
+            <button type="submit" disabled={saving}>{t("Create user")}</button>
           </form>
         )}
 
         <div className="table-wrapper">
           <table>
             <thead>
-              <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th /></tr>
+              <tr><th>{t("Name")}</th><th>{t("Email")}</th><th>{t("Role")}</th><th>{t("Status")}</th><th /></tr>
             </thead>
             <tbody>
               {users.map((user) => (
@@ -953,9 +970,7 @@ function App() {
                   <td>{user.active ? "Active" : "Inactive"}</td>
                   <td className="actions">
                     {user.active && user.id !== currentUser.id && (currentUser.role === "owner" || currentUser.role === "manager") && (
-                      <button type="button" className="danger" onClick={() => void deactivateUser(user.id)}>
-                        Deactivate
-                      </button>
+                      <button type="button" className="danger" onClick={() => void deactivateUser(user.id)}>{t("Deactivate")}</button>
                     )}
                   </td>
                 </tr>
@@ -967,15 +982,15 @@ function App() {
       <section className="card">
         <div className="section-heading">
           <div>
-            <h2>Inventory</h2>
-            <p className="subtitle">Current product balances by location.</p>
+            <h2>{t("Inventory")}</h2>
+            <p className="subtitle">{t("Current product balances by location.")}</p>
           </div>
-          <button type="button" className="secondary" onClick={() => void loadStock()}>Refresh</button>
+          <button type="button" className="secondary" onClick={() => void loadStock()}>{t("Refresh")}</button>
         </div>
-        {stockItems.length === 0 ? <p>No stock balances recorded yet.</p> : (
+        {stockItems.length === 0 ? <p>{t("No stock balances recorded yet.")}</p> : (
           <div className="table-wrapper">
             <table>
-              <thead><tr><th>Location</th><th>Product</th><th>Quantity</th><th>UOM</th></tr></thead>
+              <thead><tr><th>{t("Location")}</th><th>{t("Product")}</th><th>{t("Quantity")}</th><th>{t("UOM")}</th></tr></thead>
               <tbody>
                 {stockItems.map((stock) => (
                   <tr key={stock.id}>
@@ -994,27 +1009,27 @@ function App() {
       <section className="card">
         <div className="section-heading">
           <div>
-            <h2>POS Integrations</h2>
-            <p className="subtitle">Connect a POS account to a specific HoReCa location. The integration ID is now managed by the platform.</p>
+            <h2>{t("POS Integrations")}</h2>
+            <p className="subtitle">{t("Connect a POS account to a specific HoReCa location. The integration ID is now managed by the platform.")}</p>
           </div>
-          <button type="button" className="secondary" onClick={() => void loadIntegrations()}>Refresh</button>
+          <button type="button" className="secondary" onClick={() => void loadIntegrations()}>{t("Refresh")}</button>
         </div>
 
         {(currentUser.role === "owner" || currentUser.role === "manager") && (
           <form onSubmit={createIntegration} className="form user-form">
-            <label>Name<input value={newIntegrationName} onChange={(e) => setNewIntegrationName(e.target.value)} placeholder="Main POS" required /></label>
-            <label>Provider<select value={newIntegrationProvider} onChange={(e) => setNewIntegrationProvider(e.target.value)} required><option value="">Select</option>{posProviders.map((provider) => <option key={provider.provider} value={provider.provider}>{provider.display_name}</option>)}</select></label>
-            <label>Location<select value={newIntegrationLocationId} onChange={(e) => setNewIntegrationLocationId(e.target.value)} required><option value="">Select</option>{locations.filter((l) => l.active).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
-            <label>Connection<select value={newIntegrationConnectionType} onChange={(e) => setNewIntegrationConnectionType(e.target.value as POSIntegration["connection_type"])}><option value="api">API</option><option value="webhook">Webhook</option><option value="file">File</option></select></label>
-            <label>Base URL<input value={newIntegrationBaseUrl} onChange={(e) => setNewIntegrationBaseUrl(e.target.value)} placeholder="https://..." /></label>
-            <label>External Account ID<input value={newIntegrationAccountId} onChange={(e) => setNewIntegrationAccountId(e.target.value)} /></label>
-            <button type="submit">Add integration</button>
+            <label>{t("Name")}<input value={newIntegrationName} onChange={(e) => setNewIntegrationName(e.target.value)} placeholder={t("Main POS")} required /></label>
+            <label>{t("Provider")}<select value={newIntegrationProvider} onChange={(e) => setNewIntegrationProvider(e.target.value)} required><option value="">{t("Select")}</option>{posProviders.map((provider) => <option key={provider.provider} value={provider.provider}>{provider.display_name}</option>)}</select></label>
+            <label>{t("Location")}<select value={newIntegrationLocationId} onChange={(e) => setNewIntegrationLocationId(e.target.value)} required><option value="">{t("Select")}</option>{locations.filter((l) => l.active).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+            <label>{t("Connection")}<select value={newIntegrationConnectionType} onChange={(e) => setNewIntegrationConnectionType(e.target.value as POSIntegration["connection_type"])}><option value="api">{t("API")}</option><option value="webhook">{t("Webhook")}</option><option value="file">{t("File")}</option></select></label>
+            <label>{t("Base URL")}<input value={newIntegrationBaseUrl} onChange={(e) => setNewIntegrationBaseUrl(e.target.value)} placeholder={t("https://...")} /></label>
+            <label>{t("External Account ID")}<input value={newIntegrationAccountId} onChange={(e) => setNewIntegrationAccountId(e.target.value)} /></label>
+            <button type="submit">{t("Add integration")}</button>
           </form>
         )}
 
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Name</th><th>Provider</th><th>Location</th><th>Connection</th><th>Status</th><th>Last sync</th><th>ID</th><th /></tr></thead>
+            <thead><tr><th>{t("Name")}</th><th>{t("Provider")}</th><th>{t("Location")}</th><th>{t("Connection")}</th><th>{t("Status")}</th><th>{t("Last sync")}</th><th>{t("ID")}</th><th /></tr></thead>
             <tbody>
               {integrations.map((integration) => (
                 <tr key={integration.id}>
@@ -1028,9 +1043,9 @@ function App() {
                   <td className="actions">
                     {(currentUser.role === "owner" || currentUser.role === "manager") && integration.active && (
                       <>
-                        <button type="button" className="secondary" onClick={() => void testIntegration(integration.id)}>Test</button>
-                        <button type="button" className="secondary" onClick={() => void syncIntegration(integration.id)}>Sync</button><button type="button" className="secondary" onClick={() => void loadSyncRuns(integration.id)}>History</button>
-                        <button type="button" className="danger" onClick={() => void deactivateIntegration(integration.id)}>Deactivate</button>
+                        <button type="button" className="secondary" onClick={() => void testIntegration(integration.id)}>{t("Test")}</button>
+                        <button type="button" className="secondary" onClick={() => void syncIntegration(integration.id)}>{t("Sync")}</button><button type="button" className="secondary" onClick={() => void loadSyncRuns(integration.id)}>{t("History")}</button>
+                        <button type="button" className="danger" onClick={() => void deactivateIntegration(integration.id)}>{t("Deactivate")}</button>
                       </>
                     )}
                   </td>
@@ -1044,18 +1059,18 @@ function App() {
       <section className="card">
         <div className="section-heading">
           <div>
-            <h2>Sync History</h2>
-            <p className="subtitle">Audit trail for POS synchronization runs.</p>
+            <h2>{t("Sync History")}</h2>
+            <p className="subtitle">{t("Audit trail for POS synchronization runs.")}</p>
           </div>
         </div>
         {Object.entries(syncRuns).length === 0 ? (
-          <p>Load history from a POS integration to see its synchronization runs.</p>
+          <p>{t("Load history from a POS integration to see its synchronization runs.")}</p>
         ) : (
           Object.entries(syncRuns).map(([integrationId, runs]) => (
             <div key={integrationId} className="table-wrapper">
               <table>
                 <thead>
-                  <tr><th>Integration</th><th>Started</th><th>Status</th><th>Fetched</th><th>Imported</th><th>Duplicates</th><th>Error</th></tr>
+                  <tr><th>{t("Integration")}</th><th>{t("Started")}</th><th>{t("Status")}</th><th>{t("Fetched")}</th><th>{t("Imported")}</th><th>{t("Duplicates")}</th><th>{t("Error")}</th></tr>
                 </thead>
                 <tbody>
                   {runs.map((run) => (
@@ -1077,16 +1092,16 @@ function App() {
       </section>
 
       <section className="card">
-        <div className="section-heading"><div><h2>Product Master</h2><p className="subtitle">Canonical products used by the platform.</p></div></div>
+        <div className="section-heading"><div><h2>{t("Product Master")}</h2><p className="subtitle">{t("Canonical products used by the platform.")}</p></div></div>
         {(currentUser.role === "owner" || currentUser.role === "manager") && (
           <form onSubmit={createProduct} className="form user-form">
-            <label>Name<input value={newProductName} onChange={(e) => setNewProductName(e.target.value)} required /></label>
-            <label>SKU<input value={newProductSku} onChange={(e) => setNewProductSku(e.target.value)} /></label>
-            <label>Base UOM<input value={newProductUom} onChange={(e) => setNewProductUom(e.target.value.toUpperCase())} required /></label>
-            <button type="submit">Create product</button>
+            <label>{t("Name")}<input value={newProductName} onChange={(e) => setNewProductName(e.target.value)} required /></label>
+            <label>{t("SKU")}<input value={newProductSku} onChange={(e) => setNewProductSku(e.target.value)} /></label>
+            <label>{t("Base UOM")}<input value={newProductUom} onChange={(e) => setNewProductUom(e.target.value.toUpperCase())} required /></label>
+            <button type="submit">{t("Create product")}</button>
           </form>
         )}
-        <div className="table-wrapper"><table><thead><tr><th>Name</th><th>SKU</th><th>Base UOM</th></tr></thead>
+        <div className="table-wrapper"><table><thead><tr><th>{t("Name")}</th><th>{t("SKU")}</th><th>{t("Base UOM")}</th></tr></thead>
           <tbody>{products.map((p) => <tr key={p.id}><td>{p.name}</td><td>{p.sku ?? "—"}</td><td>{p.base_uom}</td></tr>)}</tbody>
         </table></div>
       </section>
@@ -1094,18 +1109,18 @@ function App() {
       <section className="card">
         <div className="section-heading">
           <div>
-            <h2>Unmatched POS Products</h2>
-            <p className="subtitle">Products received from POS integrations that could not be linked to the platform product master.</p>
+            <h2>{t("Unmatched POS Products")}</h2>
+            <p className="subtitle">{t("Products received from POS integrations that could not be linked to the platform product master.")}</p>
           </div>
-          <button type="button" className="secondary" onClick={() => void loadUnmatchedProducts()}>Refresh</button>
+          <button type="button" className="secondary" onClick={() => void loadUnmatchedProducts()}>{t("Refresh")}</button>
         </div>
         {unmatchedProducts.length === 0 ? (
-          <p>No unmatched POS products.</p>
+          <p>{t("No unmatched POS products.")}</p>
         ) : (
           <div className="table-wrapper">
             <table>
               <thead>
-                <tr><th>POS Product</th><th>Integration</th><th>UOM</th><th>Occurrences</th><th>Total Qty</th><th /></tr>
+                <tr><th>{t("POS Product")}</th><th>{t("Integration")}</th><th>{t("UOM")}</th><th>{t("Occurrences")}</th><th>{t("Total Qty")}</th><th /></tr>
               </thead>
               <tbody>
                 {unmatchedProducts.map((item) => (
@@ -1140,32 +1155,32 @@ function App() {
       </section>
 
       <section className="card">
-        <div className="section-heading"><div><h2>POS Product Mapping</h2><p className="subtitle">Map an external POS product to the canonical product.</p></div></div>
+        <div className="section-heading"><div><h2>{t("POS Product Mapping")}</h2><p className="subtitle">{t("Map an external POS product to the canonical product.")}</p></div></div>
         {(currentUser.role === "owner" || currentUser.role === "manager") && (
           <form onSubmit={createMapping} className="form user-form">
-            <label>POS Integration<select value={mappingIntegrationId} onChange={(e) => setMappingIntegrationId(e.target.value)} required><option value="">Select</option>{integrations.filter((i) => i.active).map((i) => <option key={i.id} value={i.id}>{i.name} · {i.provider} · {locations.find((l) => l.id === i.location_id)?.name ?? i.location_id}</option>)}</select></label>
-            <label>POS Product ID<input value={mappingExternalId} onChange={(e) => setMappingExternalId(e.target.value)} required /></label>
-            <label>Platform Product<select value={mappingProductId} onChange={(e) => setMappingProductId(e.target.value)} required><option value="">Select</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-            <button type="submit">Create mapping</button>
+            <label>{t("POS Integration")}<select value={mappingIntegrationId} onChange={(e) => setMappingIntegrationId(e.target.value)} required><option value="">{t("Select")}</option>{integrations.filter((i) => i.active).map((i) => <option key={i.id} value={i.id}>{i.name} · {i.provider} · {locations.find((l) => l.id === i.location_id)?.name ?? i.location_id}</option>)}</select></label>
+            <label>{t("POS Product ID")}<input value={mappingExternalId} onChange={(e) => setMappingExternalId(e.target.value)} required /></label>
+            <label>{t("Platform Product")}<select value={mappingProductId} onChange={(e) => setMappingProductId(e.target.value)} required><option value="">{t("Select")}</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+            <button type="submit">{t("Create mapping")}</button>
           </form>
         )}
-        <div className="table-wrapper"><table><thead><tr><th>POS Product</th><th>Platform Product</th><th>Method</th></tr></thead>
+        <div className="table-wrapper"><table><thead><tr><th>{t("POS Product")}</th><th>{t("Platform Product")}</th><th>{t("Method")}</th></tr></thead>
           <tbody>{mappings.map((m) => <tr key={m.id}><td>{m.external_product_name ?? m.external_product_id}</td><td>{products.find((p) => p.id === m.product_id)?.name ?? m.product_id}</td><td>{m.match_method}</td></tr>)}</tbody>
         </table></div>
       </section>
 
       <section className="card">
-        <div className="section-heading"><div><h2>UOM Conversions</h2><p className="subtitle">Normalize POS quantities into the product base UOM.</p></div></div>
+        <div className="section-heading"><div><h2>{t("UOM Conversions")}</h2><p className="subtitle">{t("Normalize POS quantities into the product base UOM.")}</p></div></div>
         {(currentUser.role === "owner" || currentUser.role === "manager") && (
           <form onSubmit={createConversion} className="form user-form">
-            <label>Product<select value={conversionProductId} onChange={(e) => setConversionProductId(e.target.value)} required><option value="">Select</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.base_uom})</option>)}</select></label>
-            <label>From UOM<input value={conversionFromUom} onChange={(e) => setConversionFromUom(e.target.value.toUpperCase())} placeholder="CASE" required /></label>
-            <label>To UOM<input value={conversionToUom} onChange={(e) => setConversionToUom(e.target.value.toUpperCase())} placeholder="EA" required /></label>
-            <label>Factor<input value={conversionFactor} onChange={(e) => setConversionFactor(e.target.value)} type="number" step="0.000001" min="0.000001" required /></label>
-            <button type="submit">Create conversion</button>
+            <label>{t("Product")}<select value={conversionProductId} onChange={(e) => setConversionProductId(e.target.value)} required><option value="">{t("Select")}</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.base_uom})</option>)}</select></label>
+            <label>{t("From UOM")}<input value={conversionFromUom} onChange={(e) => setConversionFromUom(e.target.value.toUpperCase())} placeholder={t("CASE")} required /></label>
+            <label>{t("To UOM")}<input value={conversionToUom} onChange={(e) => setConversionToUom(e.target.value.toUpperCase())} placeholder={t("EA")} required /></label>
+            <label>{t("Factor")}<input value={conversionFactor} onChange={(e) => setConversionFactor(e.target.value)} type="number" step="0.000001" min="0.000001" required /></label>
+            <button type="submit">{t("Create conversion")}</button>
           </form>
         )}
-        <div className="table-wrapper"><table><thead><tr><th>Product</th><th>From</th><th>To</th><th>Factor</th></tr></thead>
+        <div className="table-wrapper"><table><thead><tr><th>{t("Product")}</th><th>{t("From")}</th><th>{t("To")}</th><th>{t("Factor")}</th></tr></thead>
           <tbody>{uomConversions.map((c) => <tr key={c.id}><td>{products.find((p) => p.id === c.product_id)?.name ?? c.product_id}</td><td>{c.from_uom}</td><td>{c.to_uom}</td><td>{c.factor}</td></tr>)}</tbody>
         </table></div>
       </section>
@@ -1193,6 +1208,7 @@ function App() {
             {tab === "settings" && (
               <SettingsView
                 {...viewProps}
+                reloadLocations={async () => { if (selectedCompanyId !== null) await loadLocations(selectedCompanyId); }}
                 onSignedOutEverywhere={logout}
                 onPasswordChanged={(newToken) => { localStorage.setItem(TOKEN_KEY, newToken); setToken(newToken); }}
               />

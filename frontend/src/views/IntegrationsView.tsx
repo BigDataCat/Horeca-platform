@@ -1,3 +1,4 @@
+import { useT } from "../i18n";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { canManage } from "../types";
@@ -9,6 +10,7 @@ type WebhookEvent = { id: number; external_event_id: string; event_type: string;
 type SyncRun = { id: number; started_at: string; status: string; fetched: number; imported: number; skipped_duplicates: number; error_message: string | null; trigger: string };
 
 export default function IntegrationsView({ api, role, locations, integrations, refreshIntegrations }: ViewProps) {
+  const t = useT();
   const manage = canManage(role);
   const providers = useAsync(() => api.get<Provider[]>("/integrations/pos/providers"), [api]);
   const action = useAction();
@@ -66,7 +68,7 @@ export default function IntegrationsView({ api, role, locations, integrations, r
         )}
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Name</th><th>Provider</th><th>Location</th><th>Status</th><th>Schedule</th><th>Last sync</th><th /></tr></thead>
+            <thead><tr><th>{t("Name")}</th><th>{t("Provider")}</th><th>{t("Location")}</th><th>{t("Status")}</th><th>{t("Schedule")}</th><th>{t("Last sync")}</th><th /></tr></thead>
             <tbody>
               {integrations.map((i) => (
                 <tr key={i.id} className={selected === i.id ? "selected-row" : ""} onClick={() => setSelected(i.id)}>
@@ -74,25 +76,25 @@ export default function IntegrationsView({ api, role, locations, integrations, r
                   <td>{i.provider}</td>
                   <td>{nameOf(locations, i.location_id)}</td>
                   <td>
-                    <span className={`badge ${i.sync_paused_reason ? "critical" : i.status === "error" ? "warning" : "completed"}`}>{i.sync_paused_reason ? "paused" : i.status}</span>
+                    <span className={`badge ${i.sync_paused_reason ? "critical" : i.status === "error" ? "warning" : "completed"}`}>{t(i.sync_paused_reason ? "paused" : i.status)}</span>
                     {i.consecutive_failures > 0 && <span className="subtitle"> {i.consecutive_failures} failure(s)</span>}
                   </td>
-                  <td>{i.sync_interval_minutes ? `every ${i.sync_interval_minutes} min` : "manual"}</td>
+                  <td>{i.sync_interval_minutes ? `${t("every")} ${i.sync_interval_minutes} min` : t("manual")}</td>
                   <td>{fmtDate(i.last_synced_at)}</td>
                   <td className="actions" onClick={(e) => e.stopPropagation()}>
                     {manage && i.active && (
                       <>
-                        <button type="button" className="secondary" disabled={action.busy} onClick={() => void action.run(async () => { await api.post(`/integrations/pos/${i.id}/test`); await reload(); }, "Connection test finished.")}>Test</button>
-                        {i.provider !== "csv" && <button type="button" disabled={action.busy} onClick={() => void action.run(async () => { await api.post(`/integrations/pos/${i.id}/sync`); setSelected(i.id); await reload(); }, "Sync finished.").then(reload)}>Sync now</button>}
-                        {i.provider !== "csv" && <button type="button" className="secondary" onClick={() => void setInterval(i)}>Schedule</button>}
-                        <button type="button" className="secondary" onClick={() => void action.run(async () => { const r = await api.post<{ webhook_token: string }>(`/integrations/pos/${i.id}/webhook-token`); setToken({ id: i.id, value: r.webhook_token }); await refreshIntegrations(); })}>{i.webhook_configured ? "Rotate token" : "Webhook token"}</button>
-                        <button type="button" className="danger" onClick={() => { if (window.confirm(`Deactivate ${i.name}?`)) void action.run(async () => { await api.del(`/integrations/pos/${i.id}`); await reload(); }); }}>Deactivate</button>
+                        <button type="button" className="secondary" disabled={action.busy} onClick={() => void action.run(async () => { await api.post(`/integrations/pos/${i.id}/test`); await reload(); }, "Connection test finished.")}>{t("Test")}</button>
+                        {i.provider !== "csv" && <button type="button" disabled={action.busy} onClick={() => void action.run(async () => { await api.post(`/integrations/pos/${i.id}/sync`); setSelected(i.id); await reload(); }, "Sync finished.").then(reload)}>{t("Sync now")}</button>}
+                        {i.provider !== "csv" && <button type="button" className="secondary" onClick={() => void setInterval(i)}>{t("Schedule")}</button>}
+                        <button type="button" className="secondary" onClick={() => void action.run(async () => { const r = await api.post<{ webhook_token: string }>(`/integrations/pos/${i.id}/webhook-token`); setToken({ id: i.id, value: r.webhook_token }); await refreshIntegrations(); })}>{t(i.webhook_configured ? "Rotate token" : "Webhook token")}</button>
+                        <button type="button" className="danger" onClick={() => { if (window.confirm(`Deactivate ${i.name}?`)) void action.run(async () => { await api.del(`/integrations/pos/${i.id}`); await reload(); }); }}>{t("Deactivate")}</button>
                       </>
                     )}
                   </td>
                 </tr>
               ))}
-              {integrations.length === 0 && <tr><td colSpan={7}>No integrations yet.</td></tr>}
+              {integrations.length === 0 && <tr><td colSpan={7}>{t("No integrations yet.")}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -104,11 +106,11 @@ export default function IntegrationsView({ api, role, locations, integrations, r
       {manage && (
         <Card title="Add integration">
           <form className="form integration-form" onSubmit={create}>
-            <label>Location<select value={form.location_id} onChange={(e) => setForm({ ...form, location_id: e.target.value })} required><option value="">Select</option>{locations.filter((l) => l.active).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
-            <label>Provider<select value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })} required><option value="">Select</option>{(providers.data ?? []).map((p) => <option key={p.provider} value={p.provider}>{p.display_name}</option>)}</select></label>
-            <label>Name<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label>
-            <label>Auto-sync (min)<input type="number" min="5" max="1440" value={form.interval} onChange={(e) => setForm({ ...form, interval: e.target.value })} placeholder="manual" /></label>
-            <button type="submit" disabled={action.busy}>Create</button>
+            <label>{t("Location")}<select value={form.location_id} onChange={(e) => setForm({ ...form, location_id: e.target.value })} required><option value="">{t("Select")}</option>{locations.filter((l) => l.active).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+            <label>{t("Provider")}<select value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })} required><option value="">{t("Select")}</option>{(providers.data ?? []).map((p) => <option key={p.provider} value={p.provider}>{p.display_name}</option>)}</select></label>
+            <label>{t("Name")}<input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></label>
+            <label>{t("Auto-sync (min)")}<input type="number" min="5" max="1440" value={form.interval} onChange={(e) => setForm({ ...form, interval: e.target.value })} placeholder={t("manual")} /></label>
+            <button type="submit" disabled={action.busy}>{t("Create")}</button>
           </form>
         </Card>
       )}
@@ -119,10 +121,10 @@ export default function IntegrationsView({ api, role, locations, integrations, r
             <ErrorNote message={runs.error} />
             <div className="table-wrapper">
               <table>
-                <thead><tr><th>Started</th><th>Trigger</th><th>Status</th><th>Fetched</th><th>Imported</th><th>Duplicates</th><th>Error</th></tr></thead>
+                <thead><tr><th>{t("Started")}</th><th>{t("Trigger")}</th><th>{t("Status")}</th><th>{t("Fetched")}</th><th>{t("Imported")}</th><th>{t("Duplicates")}</th><th>{t("Error")}</th></tr></thead>
                 <tbody>
-                  {(runs.data ?? []).map((r) => <tr key={r.id}><td>{fmtDate(r.started_at)}</td><td>{r.trigger}</td><td><span className={`badge ${r.status === "success" ? "completed" : "critical"}`}>{r.status}</span></td><td>{r.fetched}</td><td>{r.imported}</td><td>{r.skipped_duplicates}</td><td>{r.error_message ?? ""}</td></tr>)}
-                  {runs.data?.length === 0 && <tr><td colSpan={7}>No sync runs yet.</td></tr>}
+                  {(runs.data ?? []).map((r) => <tr key={r.id}><td>{fmtDate(r.started_at)}</td><td>{t(r.trigger)}</td><td><span className={`badge ${r.status === "success" ? "completed" : "critical"}`}>{t(r.status)}</span></td><td>{r.fetched}</td><td>{r.imported}</td><td>{r.skipped_duplicates}</td><td>{r.error_message ?? ""}</td></tr>)}
+                  {runs.data?.length === 0 && <tr><td colSpan={7}>{t("No sync runs yet.")}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -131,15 +133,15 @@ export default function IntegrationsView({ api, role, locations, integrations, r
             <ErrorNote message={events.error} />
             <div className="table-wrapper">
               <table>
-                <thead><tr><th>Received</th><th>Event</th><th>Type</th><th>Attempts</th><th>Error</th><th /></tr></thead>
+                <thead><tr><th>{t("Received")}</th><th>{t("Event")}</th><th>{t("Type")}</th><th>{t("Attempts")}</th><th>{t("Error")}</th><th /></tr></thead>
                 <tbody>
                   {(events.data ?? []).map((e) => (
                     <tr key={e.id}>
                       <td>{fmtDate(e.received_at)}</td><td>{e.external_event_id}</td><td>{e.event_type}</td><td>{e.attempts}</td><td>{e.error_message}</td>
-                      <td>{manage && <button type="button" disabled={action.busy} onClick={() => void action.run(async () => { await api.post(`/integrations/pos/${selected}/webhook-events/${e.id}/replay`); await events.reload(); }, "Event replayed.")}>Replay</button>}</td>
+                      <td>{manage && <button type="button" disabled={action.busy} onClick={() => void action.run(async () => { await api.post(`/integrations/pos/${selected}/webhook-events/${e.id}/replay`); await events.reload(); }, "Event replayed.")}>{t("Replay")}</button>}</td>
                     </tr>
                   ))}
-                  {events.data?.length === 0 && <tr><td colSpan={6}>No failed events.</td></tr>}
+                  {events.data?.length === 0 && <tr><td colSpan={6}>{t("No failed events.")}</td></tr>}
                 </tbody>
               </table>
             </div>

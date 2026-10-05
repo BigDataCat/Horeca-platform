@@ -1,6 +1,6 @@
 export type Role = "owner" | "manager" | "employee";
 
-export type Location = { id: number; name: string; active: boolean };
+export type Location = { id: number; name: string; active: boolean; timezone?: string };
 export type Product = {
   id: number;
   name: string;

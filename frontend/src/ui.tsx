@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useT } from "./i18n";
 
 export function useAsync<T>(loader: () => Promise<T>, deps: unknown[]) {
   const [data, setData] = useState<T | null>(null);
@@ -28,12 +29,13 @@ export function ErrorNote({ message }: { message: string }) {
 }
 
 export function Card({ title, subtitle, actions, children }: { title: string; subtitle?: string; actions?: ReactNode; children: ReactNode }) {
+  const t = useT();
   return (
     <section className="card">
       <div className="section-heading">
         <div>
-          <h2>{title}</h2>
-          {subtitle && <p className="subtitle">{subtitle}</p>}
+          <h2>{t(title)}</h2>
+          {subtitle && <p className="subtitle">{t(subtitle)}</p>}
         </div>
         {actions && <div className="actions">{actions}</div>}
       </div>
@@ -43,12 +45,13 @@ export function Card({ title, subtitle, actions, children }: { title: string; su
 }
 
 export function Pager({ page, size, total, onChange }: { page: number; size: number; total: number; onChange: (page: number) => void }) {
+  const t = useT();
   const pages = Math.max(1, Math.ceil(total / size));
   return (
     <div className="actions pager">
-      <button type="button" className="secondary" disabled={page <= 0} onClick={() => onChange(page - 1)}>Previous</button>
-      <span>Page {page + 1} of {pages} · {total} rows</span>
-      <button type="button" className="secondary" disabled={page + 1 >= pages} onClick={() => onChange(page + 1)}>Next</button>
+      <button type="button" className="secondary" disabled={page <= 0} onClick={() => onChange(page - 1)}>{t("Previous")}</button>
+      <span>{t("Page")} {page + 1} / {pages} · {total} {t("rows")}</span>
+      <button type="button" className="secondary" disabled={page + 1 >= pages} onClick={() => onChange(page + 1)}>{t("Next")}</button>
     </div>
   );
 }
@@ -66,6 +69,7 @@ export function nameOf<T extends { id: number; name: string }>(items: T[], id: n
 }
 
 export function useAction() {
+  const t = useT();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -75,7 +79,7 @@ export function useAction() {
     setNotice("");
     try {
       await action();
-      setNotice(success);
+      setNotice(success ? t(success) : "");
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

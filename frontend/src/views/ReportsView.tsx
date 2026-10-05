@@ -1,5 +1,7 @@
+import { useT } from "../i18n";
 import { useState } from "react";
 import type { ViewProps } from "../types";
+import SalesTrend from "../components/SalesTrend";
 import { Card, ErrorNote, money, useAction, useAsync } from "../ui";
 
 type Row = {
@@ -13,6 +15,7 @@ type Row = {
 };
 
 export default function ReportsView({ api, locations }: ViewProps) {
+  const t = useT();
   const [locationId, setLocationId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -27,21 +30,25 @@ export default function ReportsView({ api, locations }: ViewProps) {
   const totalRevenue = rows.reduce((sum, r) => sum + Number(r.revenue), 0);
 
   return (
+    <>
+    <Card title="Daily sales" subtitle="Net revenue per local day (each location's own time zone), net of refunds, last 14 days.">
+      <SalesTrend api={api} locationId={locationId} title="Net revenue per day" />
+    </Card>
     <Card
       title="Margins and food cost"
       subtitle="Revenue vs recipe cost per product over completed sales. Cost is blank when a recipe, an ingredient cost or a UOM conversion is missing — nothing is guessed."
-      actions={<button type="button" className="secondary" onClick={() => void action.run(() => api.download("/reports/margins.csv", "margins.csv", params))}>Export CSV</button>}
+      actions={<button type="button" className="secondary" onClick={() => void action.run(() => api.download("/reports/margins.csv", "margins.csv", params))}>{t("Export CSV")}</button>}
     >
       <div className="filters">
-        <label>Location<select value={locationId} onChange={(e) => setLocationId(e.target.value)}><option value="">All</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
-        <label>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+        <label>{t("Location")}<select value={locationId} onChange={(e) => setLocationId(e.target.value)}><option value="">{t("All")}</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+        <label>{t("From")}<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label>{t("To")}<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
       </div>
       <ErrorNote message={report.error || action.error} />
       <p className="subtitle">Total revenue in range: <strong>{money(totalRevenue)}</strong></p>
       <div className="table-wrapper">
         <table>
-          <thead><tr><th>Product</th><th>Qty sold</th><th>Revenue</th><th>Cost</th><th>Margin</th><th>Food cost %</th></tr></thead>
+          <thead><tr><th>{t("Product")}</th><th>{t("Qty sold")}</th><th>{t("Revenue")}</th><th>{t("Cost")}</th><th>{t("Margin")}</th><th>{t("Food cost %")}</th></tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.product_id}>
@@ -53,10 +60,11 @@ export default function ReportsView({ api, locations }: ViewProps) {
                 <td>{r.food_cost_pct === null ? "—" : `${money(r.food_cost_pct, 1)}%`}</td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={6}>No completed, mapped sales in this range.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={6}>{t("No completed, mapped sales in this range.")}</td></tr>}
           </tbody>
         </table>
       </div>
     </Card>
+    </>
   );
 }

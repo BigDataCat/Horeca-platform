@@ -1,8 +1,9 @@
 # Browser smoke test
 
-Walks the main workflows in a real browser against a running stack: sign-up, receiving goods, CSV
-import, recipe consumption, cancelling a sale (stock restored), filters, alerts, margins, password
-change and sign-out.
+Walks the main workflows in a real browser against a running stack (20 steps): sign-up, receiving goods, CSV
+import, recipe consumption, cancelling a sale (stock restored), partial refund, production of a semi-finished
+product, filters, alerts, margins, revenue chart, Romanian/English switch, password change, sign-out and the
+forgot-password screen.
 
 ```bash
 # 1. start an EMPTY database and the API (see README), build the frontend against it:

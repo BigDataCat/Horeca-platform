@@ -1,10 +1,11 @@
+import { useT } from "../i18n";
 import { Fragment, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { canManage } from "../types";
 import type { ViewProps } from "../types";
 import { Card, ErrorNote, Pager, fmtDate, money, nameOf, useAction, useAsync } from "../ui";
 
-type SaleLine = { id: number; product_name: string; product_id: number | null; quantity: string; uom: string; net_value: string };
+type SaleLine = { id: number; product_name: string; product_id: number | null; quantity: string; uom: string; net_value: string; refunded_quantity: string };
 type Sale = {
   id: number;
   external_id: string;
@@ -16,12 +17,14 @@ type Sale = {
   gross_value: string;
   status: string;
   status_reason: string | null;
+  refunded_net_value: string;
   lines: SaleLine[];
 };
 
 const PAGE = 25;
 
 export default function SalesView({ api, role, locations, integrations }: ViewProps) {
+  const t = useT();
   const [locationId, setLocationId] = useState("");
   const [status, setStatus] = useState("");
   const [from, setFrom] = useState("");
@@ -52,6 +55,17 @@ export default function SalesView({ api, role, locations, integrations }: ViewPr
     }, `Sale ${sale.external_id} marked ${next}. Ingredient stock was restored.`);
   }
 
+  async function refundLine(sale: Sale, line: SaleLine) {
+    const remaining = Number(line.quantity) - Number(line.refunded_quantity);
+    const answer = window.prompt(`Quantity of "${line.product_name}" to refund (up to ${remaining}):`, String(remaining));
+    if (answer === null || !answer.trim()) return;
+    const reason = window.prompt("Reason (optional)") ?? null;
+    await action.run(async () => {
+      await api.post(`/sales/${sale.id}/refund-lines`, { lines: [{ line_id: line.id, quantity: answer.trim() }], reason: reason || null });
+      await sales.reload();
+    }, "Refund recorded. Revenue and ingredient stock were adjusted.");
+  }
+
   async function importCsv(event: FormEvent) {
     event.preventDefault();
     const file = fileInput.current?.files?.[0];
@@ -72,19 +86,19 @@ export default function SalesView({ api, role, locations, integrations }: ViewPr
       <Card
         title="Sales"
         subtitle="Imported transactions. Cancelled and refunded sales are excluded from revenue."
-        actions={<button type="button" className="secondary" onClick={() => void action.run(() => api.download("/sales/export.csv", "sales.csv", filters))}>Export CSV</button>}
+        actions={<button type="button" className="secondary" onClick={() => void action.run(() => api.download("/sales/export.csv", "sales.csv", filters))}>{t("Export CSV")}</button>}
       >
         <div className="filters">
-          <label>Location<select value={locationId} onChange={(e) => { setLocationId(e.target.value); setPage(0); }}><option value="">All</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
-          <label>Status<select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }}><option value="">All</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="refunded">Refunded</option></select></label>
-          <label>From<input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(0); }} /></label>
-          <label>To<input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(0); }} /></label>
+          <label>{t("Location")}<select value={locationId} onChange={(e) => { setLocationId(e.target.value); setPage(0); }}><option value="">{t("All")}</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+          <label>{t("Status")}<select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }}><option value="">{t("All")}</option><option value="completed">{t("Completed")}</option><option value="cancelled">{t("Cancelled")}</option><option value="partially_refunded">{t("Partially refunded")}</option><option value="refunded">{t("Refunded")}</option></select></label>
+          <label>{t("From")}<input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(0); }} /></label>
+          <label>{t("To")}<input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(0); }} /></label>
         </div>
         <ErrorNote message={sales.error || action.error} />
         {action.notice && <p className="notice">{action.notice}</p>}
         <div className="table-wrapper">
           <table>
-            <thead><tr><th>Sale</th><th>When</th><th>Location</th><th>Net</th><th>Gross</th><th>Status</th><th /></tr></thead>
+            <thead><tr><th>{t("Sale")}</th><th>{t("When")}</th><th>{t("Location")}</th><th>{t("Net")}</th><th>{t("Gross")}</th><th>{t("Status")}</th><th /></tr></thead>
             <tbody>
               {(sales.data?.items ?? []).map((sale) => (
                 <Fragment key={sale.id}>
@@ -94,12 +108,12 @@ export default function SalesView({ api, role, locations, integrations }: ViewPr
                     <td>{nameOf(locations, sale.location_id)}</td>
                     <td>{money(sale.net_value)} {sale.currency}</td>
                     <td>{money(sale.gross_value)} {sale.currency}</td>
-                    <td><span className={`badge ${sale.status}`}>{sale.status}</span></td>
+                    <td><span className={`badge ${sale.status}`}>{t(sale.status)}</span></td>
                     <td className="actions" onClick={(e) => e.stopPropagation()}>
-                      {canManage(role) && sale.status === "completed" && (
+                      {canManage(role) && (sale.status === "completed" || sale.status === "partially_refunded") && (
                         <>
-                          <button type="button" className="secondary" disabled={action.busy} onClick={() => void changeStatus(sale, "cancelled")}>Cancel</button>
-                          <button type="button" className="secondary" disabled={action.busy} onClick={() => void changeStatus(sale, "refunded")}>Refund</button>
+                          <button type="button" className="secondary" disabled={action.busy} onClick={() => void changeStatus(sale, "cancelled")}>{t("Cancel")}</button>
+                          <button type="button" className="secondary" disabled={action.busy} onClick={() => void changeStatus(sale, "refunded")}>{t("Refund")}</button>
                         </>
                       )}
                     </td>
@@ -108,11 +122,12 @@ export default function SalesView({ api, role, locations, integrations }: ViewPr
                     <tr>
                       <td colSpan={7}>
                         {sale.status_reason && <p className="subtitle">Reason: {sale.status_reason}</p>}
+                        {Number(sale.refunded_net_value) > 0 && <p className="subtitle">Refunded so far: {money(sale.refunded_net_value)} {sale.currency} net</p>}
                         <table>
-                          <thead><tr><th>Product</th><th>Qty</th><th>Net</th><th>Mapped</th></tr></thead>
+                          <thead><tr><th>{t("Product")}</th><th>{t("Qty")}</th><th>{t("Refunded")}</th><th>{t("Net")}</th><th>{t("Mapped")}</th><th /></tr></thead>
                           <tbody>
                             {sale.lines.map((l) => (
-                              <tr key={l.id}><td>{l.product_name}</td><td>{l.quantity} {l.uom}</td><td>{money(l.net_value)}</td><td>{l.product_id ? "yes" : <strong>no</strong>}</td></tr>
+                              <tr key={l.id}><td>{l.product_name}</td><td>{Number(l.quantity)} {l.uom}</td><td>{Number(l.refunded_quantity) || "—"}</td><td>{money(l.net_value)}</td><td>{l.product_id ? "yes" : <strong>{t("no")}</strong>}</td><td>{canManage(role) && sale.status !== "cancelled" && sale.status !== "refunded" && Number(l.refunded_quantity) < Number(l.quantity) && <button type="button" className="secondary" disabled={action.busy} onClick={() => void refundLine(sale, l)}>{t("Refund")}</button>}</td></tr>
                             ))}
                           </tbody>
                         </table>
@@ -121,7 +136,7 @@ export default function SalesView({ api, role, locations, integrations }: ViewPr
                   )}
                 </Fragment>
               ))}
-              {sales.data?.items.length === 0 && <tr><td colSpan={7}>No sales match these filters.</td></tr>}
+              {sales.data?.items.length === 0 && <tr><td colSpan={7}>{t("No sales match these filters.")}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -131,12 +146,12 @@ export default function SalesView({ api, role, locations, integrations }: ViewPr
       {canManage(role) && (
         <Card title="Import sales from CSV" subtitle="For POS systems without an API. One row per sale line: sale_id, occurred_at, product_name, quantity, unit_price (optional: currency, external_product_id, uom, net_value, tax_value). Re-uploading is safe.">
           {csvIntegrations.length === 0 ? (
-            <p className="subtitle">Create an integration with provider “csv” (Integrations tab) to enable CSV import.</p>
+            <p className="subtitle">{t("Create an integration with provider \u201ccsv\u201d (Integrations tab) to enable CSV import.")}</p>
           ) : (
             <form className="form csv-form" onSubmit={importCsv}>
-              <label>Integration<select value={csvIntegration} onChange={(e) => setCsvIntegration(e.target.value)} required><option value="">Select</option>{csvIntegrations.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></label>
-              <label>CSV file<input ref={fileInput} type="file" accept=".csv,text/csv" required /></label>
-              <button type="submit" disabled={action.busy}>Import</button>
+              <label>{t("Integration")}<select value={csvIntegration} onChange={(e) => setCsvIntegration(e.target.value)} required><option value="">{t("Select")}</option>{csvIntegrations.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></label>
+              <label>{t("CSV file")}<input ref={fileInput} type="file" accept=".csv,text/csv" required /></label>
+              <button type="submit" disabled={action.busy}>{t("Import")}</button>
             </form>
           )}
         </Card>
