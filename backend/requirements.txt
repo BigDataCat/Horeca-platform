@@ -1,16 +1,4 @@
-fastapi>=0.115,<1
-uvicorn[standard]>=0.30,<1
-sqlalchemy>=2.0,<3
-psycopg[binary]>=3.2,<4
-alembic>=1.14,<2
-pydantic[email]>=2.10,<3
-pydantic-settings>=2.6,<3
-pwdlib[argon2]>=0.2,<1
-PyJWT>=2.10,<3
-httpx>=0.27,<1
-anthropic>=0.50,<2
-defusedxml>=0.7,<1
-pdfplumber>=0.11,<1
-pillow>=10
-pytesseract>=0.3.10,<1
-numpy>=1.26
+# Everything (development, CI, and the single-container default). Production can split the two services:
+# the API image uses requirements-api.txt, the invoice-reader image uses requirements-reader.txt.
+-r requirements-api.txt
+-r requirements-reader.txt

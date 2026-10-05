@@ -374,6 +374,8 @@ export const ro: Record<string, string> = {
   "draft": "ciornă",
   "posted": "postată",
   "failed": "eșuată",
+  "reading": "se citește",
+  "being read…": "se citește…",
   "rejected": "respinsă",
   "Source": "Sursă",
   "Document": "Document",

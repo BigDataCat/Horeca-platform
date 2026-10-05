@@ -189,7 +189,7 @@ def post_invoice_endpoint(
 def reject_invoice(invoice_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> InvoiceImportRead:
     require_manager(current_user)
     inv = _own(db, current_user, invoice_id)
-    if inv.status not in {"draft", "failed"}:
+    if inv.status not in {"draft", "failed", "reading"}:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Invoice is already {inv.status}")
     inv.status = "rejected"
     db.commit()

@@ -24,6 +24,9 @@ x-backend-env: &backend-env
   APP_BASE_URL: https://${DOMAIN}
   TRIAL_DAYS: ${TRIAL_DAYS:-}
   INVOICE_READER: ${INVOICE_READER:-local}
+  INVOICE_READER_URL: http://invoice-reader:8100
+  INVOICE_READER_TOKEN: ${INVOICE_READER_TOKEN:?Set INVOICE_READER_TOKEN (random string shared with the reader)}
+  INVOICE_READ_ASYNC: "true"
   OLLAMA_URL: ${OLLAMA_URL:-}
   OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b-instruct}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -53,7 +56,10 @@ services:
       retries: 10
 
   migrate:
-    build: ../backend
+    build:
+      context: ../backend
+      args:
+        WITH_READER: "false"
     command: ["alembic", "upgrade", "head"]
     restart: "no"
     environment: *backend-env
@@ -62,7 +68,10 @@ services:
         condition: service_healthy
 
   backend:
-    build: ../backend
+    build:
+      context: ../backend
+      args:
+        WITH_READER: "false"
     restart: unless-stopped
     env_file:
       - path: ./pos-secrets.env   # POS API secrets referenced as env:NAME (optional)
@@ -73,9 +82,14 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      invoice-reader:
+        condition: service_started
 
   worker:
-    build: ../backend
+    build:
+      context: ../backend
+      args:
+        WITH_READER: "false"
     command: ["python", "-m", "app.worker"]
     restart: unless-stopped
     env_file:
@@ -87,6 +101,20 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+
+  invoice-reader:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.reader
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      INVOICE_READER: ${INVOICE_READER:-local}
+      INVOICE_READER_TOKEN: ${INVOICE_READER_TOKEN:?Set INVOICE_READER_TOKEN}
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b-instruct}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      INVOICE_AI_MODEL: ${INVOICE_AI_MODEL:-claude-opus-5-5}
 
   frontend:
     build: ../frontend

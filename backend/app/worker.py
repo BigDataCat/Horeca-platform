@@ -11,6 +11,7 @@ import time
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.services.digest import send_alert_digests
+from app.services.invoice_intake import process_pending_reads
 from app.services.invoice_mail import poll_mailbox
 from app.services.retention import purge_expired_data
 from app.services.sync import fail_stale_runs, run_due_syncs
@@ -25,17 +26,30 @@ def _stop(*_args) -> None:
 
 
 _last_digest_check = 0.0
+_last_sync = 0.0
 _last_purge = 0.0
 _last_mail = 0.0
 DIGEST_CHECK_SECONDS = 3600
 PURGE_SECONDS = 86400
+READ_POLL_SECONDS = 5  # invoice reading is checked more often than the other jobs
+
+
+def _sync_due() -> bool:
+    global _last_sync
+    if time.monotonic() - _last_sync >= settings.worker_poll_seconds or _last_sync == 0.0:
+        _last_sync = time.monotonic()
+        return True
+    return False
 
 
 def tick() -> int:
     global _last_digest_check, _last_purge, _last_mail
     with SessionLocal() as db:
         fail_stale_runs(db)
-        processed = run_due_syncs(db)
+        processed = run_due_syncs(db) if _sync_due() else 0
+        reads = process_pending_reads(db)
+        if reads:
+            logger.info('{"event": "invoices_read", "count": %d}', reads)
         if time.monotonic() - _last_digest_check >= DIGEST_CHECK_SECONDS:
             _last_digest_check = time.monotonic()
             notified = send_alert_digests(db)
@@ -66,7 +80,7 @@ def main() -> None:
                 logger.info('{"event": "worker_synced", "integrations": %d}', processed)
         except Exception:  # keep the worker alive; the next tick retries
             logger.exception('{"event": "worker_tick_failed"}')
-        for _ in range(settings.worker_poll_seconds):
+        for _ in range(min(settings.worker_poll_seconds, READ_POLL_SECONDS)):
             if not _running:
                 break
             time.sleep(1)

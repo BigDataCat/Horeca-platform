@@ -87,6 +87,9 @@ anonymised or synthetic data there, never a raw production dump with personal da
   with a mocked server only, not with a real model: evaluate it on your own invoices before relying on it.
 - `INVOICE_READER=claude` is the cloud option (outbound HTTPS to `api.anthropic.com`, `ANTHROPIC_API_KEY`); it is
   usually the most accurate on odd layouts and costs a few cents per invoice (estimate, measure it).
+- Reader service: `docker compose logs invoice-reader`; `GET :8100/health` shows the reader and whether OCR is available.
+  If it is down, uploads stay in status "reading" and are retried (1, 2, 5, 10, 30 min, 5 attempts) before failing with a
+  message; nothing is lost. It can run on a separate machine (set `INVOICE_READER_URL`), e.g. one with more CPU.
 - Mailbox: create one mailbox (e.g. `invoices@yourdomain`) that accepts plus-addresses, enable IMAP, and set
   `IMAP_*` and `INVOICE_INBOX_ADDRESS` on the **worker**. Messages are marked seen after handling; a message that
   crashed the processor stays unseen and is retried. Check `docker compose logs worker` for `invoice_mail_polled`.

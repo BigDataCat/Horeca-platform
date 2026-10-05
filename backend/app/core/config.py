@@ -31,7 +31,12 @@ class Settings(BaseSettings):
     http_connector_allow_private: bool = False  # allow loopback/private hosts (development and tests only)
     http_connector_timeout_seconds: int = 20
     trial_days: int | None = None  # new companies' subscription expires after this many days (None = never)
-    invoice_reader: str = "local"  # local | ollama | claude
+    invoice_reader: str = "local"  # local | ollama | claude  (used where the reading actually happens)
+    invoice_reader_url: str | None = None  # send PDFs/photos to a separate reader service, e.g. http://invoice-reader:8100
+    invoice_reader_token: str | None = None  # shared secret between the API/worker and the reader service
+    invoice_reader_timeout_seconds: int = 180
+    invoice_read_async: bool = False  # True: uploads return at once and the worker reads them in the background
+    invoice_read_max_attempts: int = 5
     ollama_url: str | None = None  # e.g. http://localhost:11434
     ollama_model: str = "qwen2.5:7b-instruct"
     ollama_timeout_seconds: int = 180

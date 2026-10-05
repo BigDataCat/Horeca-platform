@@ -1,7 +1,7 @@
 """Turn supplier invoices into goods receipts: extract -> match -> reconcile -> review/auto-post."""
 
 import hashlib
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -25,6 +25,7 @@ from app.services.invoice_parsing import (
     parse_ubl,
     unwrap_zip,
 )
+from app.core.config import settings
 from app.services.receipts import post_goods_receipt
 from app.services.sales_ingestion import normalize_quantity
 
@@ -258,24 +259,26 @@ def import_invoice(
         content_type=(content_type or "")[:100] or None,
         content=content,
         status="draft",
+        read_attempts=0,
         mail_message_id=mail_message_id,
         created_by_id=user_id,
     )
     db.add(inv)
-    try:
-        if kind == "ubl_xml":
+    if kind == "ubl_xml":
+        try:
             xml = unwrap_zip(content) if content.startswith(b"PK") else content
             invoice = parse_ubl(xml)
-        else:
-            from app.services.invoice_reader import read_document  # lazy: pulls in OCR / AI libraries
-
-            invoice = read_document(content, kind)
-        if not invoice.lines:
-            raise InvoiceReadError("No invoice lines were found in the document")
-        build_draft(db, inv, invoice)
-    except InvoiceReadError as exc:
-        inv.status = "failed"
-        inv.error = str(exc)
+            if not invoice.lines:
+                raise InvoiceReadError("No invoice lines were found in the document")
+            build_draft(db, inv, invoice)
+        except InvoiceReadError as exc:
+            inv.status = "failed"
+            inv.error = str(exc)
+    elif settings.invoice_read_async:
+        inv.status = "reading"  # the worker reads it in the background; the upload returns at once
+        inv.next_read_at = datetime.now(timezone.utc)
+    else:
+        process_reading(db, inv)
     db.commit()  # the draft is saved before anything else is attempted
     db.refresh(inv)
 
@@ -283,6 +286,60 @@ def import_invoice(
         _try_auto_post(db, inv, user_id)
         db.refresh(inv)
     return inv
+
+
+READ_BACKOFF_MINUTES = (1, 2, 5, 10, 30)
+READ_LEASE_MINUTES = 10
+
+
+def process_reading(db: Session, inv: InvoiceImport) -> None:
+    """Read a PDF/photo into a draft. Permanent problems fail the invoice; a reader that is down keeps it
+    in 'reading' so the worker retries with backoff (up to INVOICE_READ_MAX_ATTEMPTS)."""
+    from app.services.invoice_reader import ReaderUnavailable, read_document  # lazy: heavy optional libraries
+
+    try:
+        invoice = read_document(inv.content or b"", inv.source_type)
+        if not invoice.lines:
+            raise InvoiceReadError("No invoice lines were found in the document")
+        build_draft(db, inv, invoice)
+        inv.status, inv.error, inv.next_read_at = "draft", None, None
+    except InvoiceReadError as exc:
+        inv.status, inv.error, inv.next_read_at = "failed", str(exc), None
+    except ReaderUnavailable as exc:
+        inv.read_attempts += 1
+        if inv.read_attempts >= settings.invoice_read_max_attempts:
+            inv.status, inv.error, inv.next_read_at = "failed", f"{exc} (gave up after {inv.read_attempts} attempts)", None
+        else:
+            delay = READ_BACKOFF_MINUTES[min(inv.read_attempts - 1, len(READ_BACKOFF_MINUTES) - 1)]
+            inv.status, inv.error = "reading", str(exc)
+            inv.next_read_at = datetime.now(timezone.utc) + timedelta(minutes=delay)
+
+
+def process_pending_reads(db: Session, limit: int = 5) -> int:
+    """Worker entry point: read invoices waiting in 'reading'. Several workers can run at once."""
+    now = datetime.now(timezone.utc)
+    waiting = db.scalars(
+        select(InvoiceImport)
+        .where(InvoiceImport.status == "reading", InvoiceImport.next_read_at <= now)
+        .order_by(InvoiceImport.id)
+        .limit(limit)
+        .with_for_update(skip_locked=True)
+    ).all()
+    ids = []
+    for inv in waiting:  # lease: another worker will not pick these up while this one is busy
+        inv.read_attempts += 1
+        inv.next_read_at = now + timedelta(minutes=READ_LEASE_MINUTES)
+        ids.append(inv.id)
+    db.commit()
+    for invoice_id in ids:
+        inv = db.get(InvoiceImport, invoice_id)
+        if inv.read_attempts > settings.invoice_read_max_attempts:
+            inv.status, inv.error, inv.next_read_at = "failed", "Reading did not complete (the worker stopped repeatedly)", None
+        else:
+            inv.read_attempts -= 1  # the lease increment above is not a failure; process_reading counts real ones
+            process_reading(db, inv)
+        db.commit()
+    return len(ids)
 
 
 def _try_auto_post(db: Session, inv: InvoiceImport, user_id: int | None) -> None:

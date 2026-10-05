@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -22,7 +22,8 @@ class InvoiceImport(TimestampMixin, Base):
     content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     content_type: Mapped[str | None] = mapped_column(String(100))
     content: Mapped[bytes | None] = mapped_column(LargeBinary)
-    # draft: extracted and matched, needs a person · posted: receipt created · rejected · failed: could not be read
+    # reading: waiting for the reader · draft: extracted and matched, needs a person · posted: receipt created
+    # rejected · failed: could not be read
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft", index=True)
     extracted: Mapped[dict | None] = mapped_column(JSON)
     warnings: Mapped[list | None] = mapped_column(JSON)
@@ -31,6 +32,9 @@ class InvoiceImport(TimestampMixin, Base):
     mail_message_id: Mapped[str | None] = mapped_column(String(300))
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # background reading: status 'reading' is picked up by the worker (retried with backoff while the reader is down)
+    read_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    next_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class ProductAlias(TimestampMixin, Base):

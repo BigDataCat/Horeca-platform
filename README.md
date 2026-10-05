@@ -129,6 +129,12 @@ Open the **Invoices** tab (or `POST /api/invoices/upload`, raw body) and upload 
   quantity x price matches its total, so misread digits are dropped instead of invented, and totals that do not add
   up raise a warning. Quality depends on the layout and scan quality (use at least ~150 dpi / a sharp photo). These
   documents are **always reviewed** by a person. Nothing leaves the server.
+- **Run the reading separately.** PDF/OCR reading is the heavy part (Tesseract, CPU), so it can run as its own
+  service: `backend/Dockerfile.reader` (`uvicorn app.reader_app:app`, port 8100, no database access). Set
+  `INVOICE_READER_URL` and the shared `INVOICE_READER_TOKEN` on the backend and worker; with `INVOICE_READ_ASYNC=true`
+  an upload returns immediately (status "reading") and the worker reads it in the background, retrying with backoff
+  if the reader is down. The production compose file does all this. For a one-off file without any server:
+  `python -m app.reader_cli invoice.pdf` prints the extracted JSON. e-Factura XML never needs the reader.
   Optional readers: `INVOICE_READER=ollama` lets a local LLM (Ollama on your hardware, `OLLAMA_URL`, `OLLAMA_MODEL`)
   structure the extracted text, falling back to the rules if it fails; `INVOICE_READER=claude` sends the document to
   the Claude API (cloud, needs `ANTHROPIC_API_KEY`, `INVOICE_AI_MODEL`).

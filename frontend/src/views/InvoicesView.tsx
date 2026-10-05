@@ -59,6 +59,13 @@ export default function InvoicesView({ api, role, locations, products }: ViewPro
     }, "Invoice read. Review it below, then post the receipt.");
   }
 
+  const reading = list.data?.items.some((i) => i.status === "reading") ?? false;
+  useEffect(() => {
+    if (!reading) return;
+    const timer = window.setInterval(() => void list.reload(), 5000);
+    return () => window.clearInterval(timer);
+  }, [reading, list]);
+
   const open = list.data?.items.find((i) => i.id === openId) ?? null;
 
   return (
@@ -101,7 +108,7 @@ export default function InvoicesView({ api, role, locations, products }: ViewPro
                   <td>{inv.extracted?.header.supplier_name ?? "—"}</td>
                   <td>{inv.extracted?.header.document_number ?? "—"}</td>
                   <td><span className={`badge ${inv.status === "posted" ? "completed" : inv.status === "failed" ? "critical" : "warning"}`}>{t(inv.status)}</span></td>
-                  <td>{inv.status === "draft" ? (inv.blocking.length ? `${inv.blocking.length} ${t("to fix")}` : t("ready")) : inv.status === "failed" ? inv.error : ""}</td>
+                  <td>{inv.status === "draft" ? (inv.blocking.length ? `${inv.blocking.length} ${t("to fix")}` : t("ready")) : inv.status === "failed" ? inv.error : inv.status === "reading" ? t("being read…") : ""}</td>
                 </tr>
               ))}
               {list.data?.items.length === 0 && <tr><td colSpan={7}>{t("No invoices yet.")}</td></tr>}
