@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     http_connector_allow_private: bool = False  # allow loopback/private hosts (development and tests only)
     http_connector_timeout_seconds: int = 20
     trial_days: int | None = None  # new companies' subscription expires after this many days (None = never)
+    anthropic_api_key: str | None = None  # enables AI reading of PDF/photo invoices
+    invoice_ai_model: str = "claude-opus-5-5"
+    imap_host: str | None = None
+    imap_port: int = 993
+    imap_user: str | None = None
+    imap_password: str | None = None
+    imap_folder: str = "INBOX"
+    invoice_inbox_address: str | None = None  # e.g. invoices@example.com; companies use invoices+TOKEN@example.com
+    invoice_poll_seconds: int = 120
     default_plan: str = "business"
     admin_api_key: str | None = None
     metrics_token: str | None = None

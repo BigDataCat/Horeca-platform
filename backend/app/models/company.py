@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, true
+from sqlalchemy import Boolean, DateTime, Integer, String, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin
 
@@ -16,6 +16,10 @@ class Company(TimestampMixin, Base):
     tax_identifier: Mapped[str | None] = mapped_column(String(50), unique=True)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RON")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    invoice_inbox_token: Mapped[str | None] = mapped_column(String(64), unique=True)
+    # Plain integer on purpose (no FK): a company <-> location FK would be circular. Validated in the API.
+    invoice_default_location_id: Mapped[int | None] = mapped_column(Integer)
+    invoice_auto_post: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     plan_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_alert_digest_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     alert_digest_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=true())

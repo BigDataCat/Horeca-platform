@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models.audit_log import AuditLog
 from app.models.company import Company
+from app.models.invoice import InvoiceImport
 from app.models.location import Location
 from app.models.pos_integration import POSIntegration
 from app.models.product import Product
@@ -37,6 +38,7 @@ TRACKED = {
     Recipe: "recipe",
     POSIntegration: "pos_integration",
     Supplier: "supplier",
+    InvoiceImport: "invoice_import",
     GoodsReceipt: "goods_receipt",
     StockCount: "stock_count",
     StockTransfer: "stock_transfer",
@@ -45,7 +47,7 @@ TRACKED = {
 # Sales are imported in bulk; only manual status changes (cancel/refund) are interesting.
 UPDATE_ONLY = {Sale: "sale"}
 
-SENSITIVE = {"password_hash", "webhook_token_hash", "token_version", "source_payload", "credentials_ref"}
+SENSITIVE = {"password_hash", "webhook_token_hash", "token_version", "source_payload", "credentials_ref", "content", "extracted", "invoice_inbox_token"}
 VOLATILE = {
     "created_at",
     "updated_at",

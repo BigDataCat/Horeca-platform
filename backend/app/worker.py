@@ -11,6 +11,7 @@ import time
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.services.digest import send_alert_digests
+from app.services.invoice_mail import poll_mailbox
 from app.services.retention import purge_expired_data
 from app.services.sync import fail_stale_runs, run_due_syncs
 
@@ -25,12 +26,13 @@ def _stop(*_args) -> None:
 
 _last_digest_check = 0.0
 _last_purge = 0.0
+_last_mail = 0.0
 DIGEST_CHECK_SECONDS = 3600
 PURGE_SECONDS = 86400
 
 
 def tick() -> int:
-    global _last_digest_check, _last_purge
+    global _last_digest_check, _last_purge, _last_mail
     with SessionLocal() as db:
         fail_stale_runs(db)
         processed = run_due_syncs(db)
@@ -39,6 +41,11 @@ def tick() -> int:
             notified = send_alert_digests(db)
             if notified:
                 logger.info('{"event": "alert_digest_sent", "companies": %d}', notified)
+        if settings.imap_host and (_last_mail == 0.0 or time.monotonic() - _last_mail >= settings.invoice_poll_seconds):
+            _last_mail = time.monotonic()
+            mail = poll_mailbox(db)
+            if mail["messages"]:
+                logger.info('{"event": "invoice_mail_polled", "result": %s}', str(mail).replace("'", '"'))
         if time.monotonic() - _last_purge >= PURGE_SECONDS or _last_purge == 0.0:
             _last_purge = time.monotonic()
             removed = purge_expired_data(db, settings.audit_retention_days, settings.webhook_event_retention_days)

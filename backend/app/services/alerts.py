@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.services.sales_ingestion import ACTIVE_STATUSES
 from app.models.inventory import ProductStock
+from app.models.invoice import InvoiceImport
 from app.models.pos_integration import POSIntegration
 from app.models.product import Product
 from app.models.recipe import Recipe, RecipeLine
@@ -56,6 +57,15 @@ def compute_alerts(db: Session, company_id: int) -> list[dict]:
     ) or 0
     if failed_webhooks:
         add("webhook_failed", "warning", f"{failed_webhooks} webhook event(s) failed and can be replayed")
+
+    # Invoices waiting for a person
+    for status, kind, severity, text in (
+        ("draft", "invoices_waiting", "warning", "{n} supplier invoice(s) wait for review before they update stock and costs"),
+        ("failed", "invoices_unreadable", "info", "{n} invoice file(s) could not be read; open them to see why"),
+    ):
+        n = db.scalar(select(func.count(InvoiceImport.id)).where(InvoiceImport.company_id == company_id, InvoiceImport.status == status)) or 0
+        if n:
+            add(kind, severity, text.format(n=n))
 
     # Mapping gaps
     unmatched = db.scalar(
