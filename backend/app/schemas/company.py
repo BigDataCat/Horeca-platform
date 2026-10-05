@@ -16,10 +16,12 @@ class CompanyUpdate(BaseModel):
     tax_identifier: str | None = Field(default=None, max_length=50)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     active: bool | None = None
+    alert_digest_enabled: bool | None = None
 
 
 class CompanyRead(CompanyBase):
     id: int
     active: bool
+    alert_digest_enabled: bool = True
 
     model_config = ConfigDict(from_attributes=True)

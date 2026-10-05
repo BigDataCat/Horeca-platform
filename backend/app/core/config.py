@@ -16,6 +16,16 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     cors_origins: str = "http://localhost:5173"
+    email_backend: str = "console"  # smtp | console | memory
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str = "HoReCa Platform <no-reply@localhost>"
+    smtp_starttls: bool = True
+    app_base_url: str = "http://localhost:5173"
+    password_reset_minutes: int = 60
+    invite_hours: int = 72
     default_plan: str = "business"
     admin_api_key: str | None = None
     metrics_token: str | None = None
@@ -33,6 +43,9 @@ class Settings(BaseSettings):
                 "JWT_SECRET_KEY must be set to a unique value of at least "
                 f"{MIN_PRODUCTION_SECRET_LENGTH} characters when APP_ENV=production"
             )
+        if self.app_env.lower() in {"production", "prod"} and self.email_backend == "console":
+            # Safe default for production: use SMTP when configured, otherwise do not log secrets.
+            self.email_backend = "smtp"
         return self
 
     model_config = SettingsConfigDict(

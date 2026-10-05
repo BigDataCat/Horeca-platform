@@ -7,6 +7,7 @@ TEST_DATABASE_URL = os.environ.get(
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-with-at-least-32-bytes")
+os.environ["EMAIL_BACKEND"] = "memory"
 
 import shutil
 import subprocess
@@ -49,11 +50,16 @@ def clean_tables(migrated_database):
 
 @pytest.fixture(autouse=True)
 def reset_login_limiter():
-    from app.api.auth import login_limiter
+    from app.api.auth import login_limiter, reset_limiter
+    from app.services import email
 
     login_limiter.clear()
+    reset_limiter.clear()
+    email.outbox.clear()
     yield
     login_limiter.clear()
+    reset_limiter.clear()
+    email.outbox.clear()
 
 
 @pytest.fixture()

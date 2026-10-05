@@ -107,11 +107,19 @@ Several workers can run at once.
 - `GET /metrics` exposes Prometheus counters (set `METRICS_TOKEN` to require `Authorization: Bearer ...`).
   Counters are per process.
 
+## E-mail
+
+Password reset (`POST /api/auth/password-reset/request|confirm`), invitations (`POST /api/users/invite`) and a
+daily alert digest to owners need an SMTP server: set `EMAIL_BACKEND=smtp`, `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, and `APP_BASE_URL` (used in links). In development the default
+`console` backend logs the message instead; tests use `memory`. Reset requests never reveal whether an
+account exists and are rate limited.
+
 ## Database migrations
 
 The migration chain currently reaches:
 
-`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013 → 0014 → 0015 → 0016 → 0017 → 0018 → 0019 → 0020 → 0021`
+`0001 → 0002 → 0003 → 0004 → 0005 → 0006 → 0007 → 0008 → 0009 → 0010 → 0011 → 0012 → 0013 → 0014 → 0015 → 0016 → 0017 → 0018 → 0019 → 0020 → 0021 → 0022`
 
 ## Run locally
 

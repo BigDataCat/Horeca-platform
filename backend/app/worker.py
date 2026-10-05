@@ -10,6 +10,7 @@ import time
 
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.services.digest import send_alert_digests
 from app.services.sync import fail_stale_runs, run_due_syncs
 
 logger = logging.getLogger("horeca.worker")
@@ -21,10 +22,21 @@ def _stop(*_args) -> None:
     _running = False
 
 
+_last_digest_check = 0.0
+DIGEST_CHECK_SECONDS = 3600
+
+
 def tick() -> int:
+    global _last_digest_check
     with SessionLocal() as db:
         fail_stale_runs(db)
-        return run_due_syncs(db)
+        processed = run_due_syncs(db)
+        if time.monotonic() - _last_digest_check >= DIGEST_CHECK_SECONDS:
+            _last_digest_check = time.monotonic()
+            notified = send_alert_digests(db)
+            if notified:
+                logger.info('{"event": "alert_digest_sent", "companies": %d}', notified)
+        return processed
 
 
 def main() -> None:

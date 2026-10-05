@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -10,12 +12,14 @@ from app.core.security import create_access_token, get_current_user, hash_passwo
 from app.models.audit_log import AuditLog
 from app.models.company import Company
 from app.models.user import User
+from app.services.account_tokens import consume_token, issue_token, send_reset_email
 from app.services.plans import PLANS
-from app.schemas.user import BootstrapRequest, PasswordChange, TokenResponse, UserCreate, UserLogin, UserRead
+from app.schemas.user import BootstrapRequest, PasswordChange, PasswordResetConfirm, PasswordResetRequest, TokenResponse, UserCreate, UserLogin, UserRead
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
 login_limiter = SlidingWindowLimiter(settings.login_max_attempts, settings.login_window_seconds)
+reset_limiter = SlidingWindowLimiter(5, 3600)
 
 
 @router.post("/bootstrap", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -187,3 +191,38 @@ def export_my_data(
             for entry in actions
         ],
     }
+
+
+@router.post("/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
+def request_password_reset(payload: PasswordResetRequest, request: Request, db: Session = Depends(get_db)) -> dict:
+    """Always answers 202 so the endpoint cannot be used to discover which e-mails have accounts."""
+    email = str(payload.email).lower()
+    client_host = request.client.host if request.client else "unknown"
+    keys = (f"email:{email}", f"ip:{client_host}")
+    response = {"detail": "If the account exists, an e-mail with instructions was sent."}
+    if any(reset_limiter.is_blocked(key) for key in keys):
+        return response
+    for key in keys:
+        reset_limiter.record_failure(key)  # counts every request, not only failures
+
+    user = db.scalar(select(User).where(func.lower(User.email) == email))
+    if user is not None and user.active and (user.company is None or user.company.active):
+        token = issue_token(db, user, "reset", timedelta(minutes=settings.password_reset_minutes))
+        db.commit()
+        send_reset_email(user, token)
+    return response
+
+
+@router.post("/password-reset/confirm", response_model=TokenResponse)
+def confirm_password_reset(payload: PasswordResetConfirm, db: Session = Depends(get_db)) -> TokenResponse:
+    """Set a new password with a reset or invitation token. Signs the user in and revokes older sessions."""
+    user = consume_token(db, payload.token)
+    if user is None:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This link is invalid or has expired")
+    user.password_hash = hash_password(payload.new_password)
+    user.token_version += 1
+    user.active = True
+    db.commit()
+    db.refresh(user)
+    return TokenResponse(access_token=create_access_token(user), user=user)

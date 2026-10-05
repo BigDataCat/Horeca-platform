@@ -9,7 +9,10 @@ from app.core.database import get_db
 from app.core.security import get_current_user, hash_password
 from app.models.user import User
 from app.services.plans import enforce_limit
-from app.schemas.user import PasswordReset, UserCreate, UserRead, UserUpdate
+from datetime import timedelta
+from app.core.config import settings
+from app.schemas.user import PasswordReset, UserCreate, UserInvite, UserRead, UserUpdate
+from app.services.account_tokens import issue_token, send_invite_email
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -187,4 +190,41 @@ def anonymize_user(
     user.token_version += 1
     db.commit()
     db.refresh(user)
+    return user
+
+
+@router.post("/invite", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+def invite_user(
+    payload: UserInvite,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """Create an account without a known password and e-mail a link to choose one."""
+    require_manager(current_user)
+    if current_user.role == "manager" and payload.role == "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Managers cannot invite owners")
+    enforce_limit(db, current_user.company_id, "users")
+
+    user = User(
+        company_id=current_user.company_id,
+        email=str(payload.email).lower(),
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        password_hash=hash_password(secrets.token_urlsafe(32)),
+        role=payload.role,
+    )
+    db.add(user)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A user with this email already exists")
+    token = issue_token(db, user, "invite", timedelta(hours=settings.invite_hours))
+    db.commit()
+    db.refresh(user)
+    if not send_invite_email(user, token, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The user was created but the invitation e-mail could not be sent. Use reset-password instead.",
+        )
     return user
