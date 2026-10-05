@@ -387,7 +387,7 @@ export const ro: Record<string, string> = {
   "Download original": "Descarcă originalul",
   "Reject this document? It will not update stock.": "Respingi acest document? Nu va actualiza stocul.",
   "Posted": "Postată",
-  "This document was read by AI. Check every line against the original before posting.": "Acest document a fost citit de AI. Verifică fiecare linie față de original înainte de postare.",
+  "This document was read automatically (PDF text or OCR). Check every line against the original before posting.": "Acest document a fost citit automat (text PDF sau OCR). Verifică fiecare linie față de original înainte de postare.",
   "On the invoice": "Pe factură",
   "Unit price (net)": "Preț unitar (net)",
   "Skip": "Ignoră",

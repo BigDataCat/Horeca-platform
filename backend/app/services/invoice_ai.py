@@ -92,6 +92,11 @@ def extract_with_ai(content: bytes, kind: str) -> ExtractedInvoice:
     if parsed is None:
         raise InvoiceReadError("The document could not be read as an invoice")
 
+    return ai_to_extracted(parsed)
+
+
+def ai_to_extracted(parsed: AIInvoice) -> ExtractedInvoice:
+    """Validate and convert the model's answer (shared by the Claude and local-LLM readers)."""
     lines = []
     for line in parsed.lines:
         quantity = _dec(line.quantity)

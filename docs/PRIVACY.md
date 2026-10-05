@@ -17,7 +17,7 @@ documented instructions from the customer.
 | Request metadata (path, status, timing, request id) | application logs | Operations and security; contain no request bodies |
 | Sales | `sales`, `sale_lines` | Business reporting. The platform does **not** store customer names, card data or loyalty ids; if a POS sends such fields they are ignored by the canonical model. Raw vendor payloads are stored in `sales.source_payload` as the canonical JSON only. |
 
-Supplier invoices and NIR (including the original file) are stored in `invoice_imports`. They normally contain business data about suppliers, not personal data, but may contain names of staff or sole traders. **PDF and photo invoices are sent to the Anthropic API for reading** (only when `ANTHROPIC_API_KEY` is set); e-Factura XML never leaves the server. List Anthropic as a sub-processor and check its data-processing terms and retention options before enabling it.
+Supplier invoices and NIR (including the original file) are stored in `invoice_imports`. They normally contain business data about suppliers, not personal data, but may contain names of staff or sole traders. By default **nothing leaves the server**: e-Factura XML is parsed exactly and PDFs/photos are read locally (text layer or Tesseract OCR). Only if an administrator sets `INVOICE_READER=claude` are PDF and photo invoices sent to the Anthropic API; in that case list Anthropic as a sub-processor and check its data-processing terms and retention options. `INVOICE_READER=ollama` keeps everything on your own hardware.
 
 No payment card data is processed. No third-party analytics or tracking scripts are included in the frontend.
 

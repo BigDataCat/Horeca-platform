@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     http_connector_allow_private: bool = False  # allow loopback/private hosts (development and tests only)
     http_connector_timeout_seconds: int = 20
     trial_days: int | None = None  # new companies' subscription expires after this many days (None = never)
+    invoice_reader: str = "local"  # local | ollama | claude
+    ollama_url: str | None = None  # e.g. http://localhost:11434
+    ollama_model: str = "qwen2.5:7b-instruct"
+    ollama_timeout_seconds: int = 180
     anthropic_api_key: str | None = None  # enables AI reading of PDF/photo invoices
     invoice_ai_model: str = "claude-opus-5-5"
     imap_host: str | None = None

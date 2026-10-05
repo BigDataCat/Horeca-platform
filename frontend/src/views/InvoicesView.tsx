@@ -170,7 +170,7 @@ function InvoiceEditor({ invoice, api, manage, locations, products, onChanged }:
       {invoice.status === "draft" && invoice.blocking.length > 0 && (
         <ul className="blocking">{invoice.blocking.map((b) => <li key={b}>{b}</li>)}</ul>
       )}
-      {invoice.source_type !== "ubl_xml" && invoice.status === "draft" && <p className="subtitle">{t("This document was read by AI. Check every line against the original before posting.")}</p>}
+      {invoice.source_type !== "ubl_xml" && invoice.status === "draft" && <p className="subtitle">{t("This document was read automatically (PDF text or OCR). Check every line against the original before posting.")}</p>}
 
       {editable && (
         <div className="filters">

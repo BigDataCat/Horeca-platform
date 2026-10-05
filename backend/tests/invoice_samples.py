@@ -72,3 +72,88 @@ def efactura_zip(xml: bytes, number="FCT-100") -> bytes:
         archive.writestr(f"{number}.xml", xml)
         archive.writestr(f"semnatura_{number}.xml", b"<Signature>not an invoice</Signature>")
     return buffer.getvalue()
+
+
+# ---------------------------------------------------------------- PDF / image invoices (generated)
+ROWS = [
+    ("1", "Carne de vita dezosata", "kg", "10,000", "42,50", "425,00"),
+    ("2", "Ulei floarea soarelui 1L", "buc", "24,000", "7,50", "180,00"),
+    ("3", "Faina alba tip 000", "kg", "50,000", "3,20", "160,00"),
+]
+HEADER_ROW = ("Nr.", "Denumire produs", "U.M.", "Cantitate", "Pret unitar", "Valoare fara TVA")
+
+
+def _header_lines(number="FCT 2026/0457", storno=False):
+    title = "FACTURA STORNO" if storno else "FACTURA FISCALA"
+    return [
+        "Furnizor: METRO CASH & CARRY ROMANIA SRL",
+        "CUI: RO 1234567  Reg. Com.: J40/1234/2001",
+        "Adresa: Str. Exemplu 10, Bucuresti",
+        "Client: RESTAURANT EXEMPLU SRL",
+        "CUI: RO 7654321",
+        f"{title} Nr. {number}",
+        "Data emiterii: 02.10.2026",
+    ]
+
+
+def _footer_lines(net="765,00", vat="68,85", gross="833,85"):
+    return [f"Total fara TVA: {net} RON", f"Total TVA 9%: {vat} RON", f"Total de plata: {gross} RON"]
+
+
+def invoice_pdf(grid=True, rows=None, number="FCT 2026/0457", storno=False, totals=None) -> bytes:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+    from reportlab.platypus import Table, TableStyle
+
+    rows = rows or ROWS
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    y = 800
+    c.setFont("Helvetica", 11)
+    for line in _header_lines(number, storno):
+        c.drawString(40, y, line)
+        y -= 16
+    y -= 12
+    if grid:
+        table = Table([HEADER_ROW, *rows], colWidths=[28, 190, 40, 70, 80, 100])
+        style = [("GRID", (0, 0), (-1, -1), 0.5, colors.black), ("FONTSIZE", (0, 0), (-1, -1), 9)]
+        table.setStyle(TableStyle(style))
+        w, h = table.wrapOn(c, 520, 400)
+        table.drawOn(c, 40, y - h)
+        y -= h + 24
+    else:
+        c.setFont("Courier", 9)
+        c.drawString(40, y, "Nr  Denumire produs              UM    Cantitate   Pret      Valoare")
+        y -= 14
+        for r in rows:
+            c.drawString(40, y, f"{r[0]:<3} {r[1]:<28} {r[2]:<5} {r[3]:>9}  {r[4]:>8}  {r[5]:>9}")
+            y -= 14
+        y -= 10
+        c.setFont("Helvetica", 11)
+    for line in _footer_lines(*(totals or ())):
+        c.drawString(300, y, line)
+        y -= 16
+    c.showPage()
+    c.save()
+    return buffer.getvalue()
+
+
+def render_png(pdf: bytes, resolution=200) -> bytes:
+    import pdfplumber
+
+    with pdfplumber.open(io.BytesIO(pdf)) as document:
+        image = document.pages[0].to_image(resolution=resolution).original.convert("RGB")
+    out = io.BytesIO()
+    image.save(out, "PNG")
+    return out.getvalue()
+
+
+def scanned_pdf(pdf: bytes) -> bytes:
+    """An image-only PDF (no text layer), like a scanner produces."""
+    from PIL import Image
+
+    image = Image.open(io.BytesIO(render_png(pdf))).convert("RGB")
+    out = io.BytesIO()
+    image.save(out, "PDF", resolution=200)
+    return out.getvalue()

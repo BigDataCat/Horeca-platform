@@ -124,8 +124,14 @@ Open the **Invoices** tab (or `POST /api/invoices/upload`, raw body) and upload 
 - **e-Factura XML or ZIP** (UBL / CIUS-RO) is read exactly. Lines are matched to products by remembered supplier
   wording, supplier code (SKU) or exact name; units are never guessed (a missing conversion blocks posting until
   you define it). Credit notes are not posted. Totals that do not add up raise a warning.
-- **PDF and photos** are read by Claude (set `ANTHROPIC_API_KEY`; model `INVOICE_AI_MODEL`, default
-  `claude-opus-5-5`) and are **always reviewed** by a person. The document is treated as untrusted data.
+- **PDF and photos** are read **locally on your server by default** (`INVOICE_READER=local`): the PDF text layer,
+  or Tesseract OCR (Romanian + English) for scans and photos, then rule-based parsing. A line is kept only if
+  quantity x price matches its total, so misread digits are dropped instead of invented, and totals that do not add
+  up raise a warning. Quality depends on the layout and scan quality (use at least ~150 dpi / a sharp photo). These
+  documents are **always reviewed** by a person. Nothing leaves the server.
+  Optional readers: `INVOICE_READER=ollama` lets a local LLM (Ollama on your hardware, `OLLAMA_URL`, `OLLAMA_MODEL`)
+  structure the extracted text, falling back to the rules if it fails; `INVOICE_READER=claude` sends the document to
+  the Claude API (cloud, needs `ANTHROPIC_API_KEY`, `INVOICE_AI_MODEL`).
 - Posting creates the goods receipt (stock up, net purchase price becomes the product cost) and remembers the
   supplier's product names, so the next invoice from them needs no review. Owners can enable automatic posting for
   exact XML invoices that match completely and reconcile.

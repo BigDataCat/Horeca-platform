@@ -152,6 +152,8 @@ def build_draft(db: Session, inv: InvoiceImport, invoice: ExtractedInvoice) -> N
         "lines": lines,
     }
     warnings = reconcile(inv.extracted)
+    if inv.source_type != "ubl_xml":
+        warnings.insert(0, "Read automatically from a PDF/photo: compare every line with the original before posting")
     if supplier is None and invoice.supplier_name:
         warnings.append(f"New supplier '{invoice.supplier_name}' will be created when the receipt is posted")
     if supplier and invoice.document_number:
@@ -265,9 +267,9 @@ def import_invoice(
             xml = unwrap_zip(content) if content.startswith(b"PK") else content
             invoice = parse_ubl(xml)
         else:
-            from app.services.invoice_ai import extract_with_ai  # imported lazily: needs the anthropic SDK
+            from app.services.invoice_reader import read_document  # lazy: pulls in OCR / AI libraries
 
-            invoice = extract_with_ai(content, kind)
+            invoice = read_document(content, kind)
         if not invoice.lines:
             raise InvoiceReadError("No invoice lines were found in the document")
         build_draft(db, inv, invoice)
@@ -409,4 +411,4 @@ def apply_patch(db: Session, inv: InvoiceImport, patch, company_id: int) -> None
             line["unit_price"] = _money(change.unit_price)
     inv.extracted = data
     refresh_conversions(db, inv)
-    inv.warnings = reconcile(inv.extracted) + [w for w in (inv.warnings or []) if w.startswith(("New supplier", "Invoice "))]
+    inv.warnings = reconcile(inv.extracted) + [w for w in (inv.warnings or []) if w.startswith(("New supplier", "Invoice ", "Read automatically"))]

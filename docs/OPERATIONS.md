@@ -78,10 +78,15 @@ anonymised or synthetic data there, never a raw production dump with personal da
   credentials yet (the first real connector must define this: environment variable names or a vault path).
 
 ## Invoice intake
-- AI reading needs outbound HTTPS to `api.anthropic.com` and `ANTHROPIC_API_KEY`. A page or photo costs a few cents
-  at the default model (estimate: a few thousand input tokens plus roughly a thousand output tokens per invoice);
-  measure on your own invoices and pick a cheaper `INVOICE_AI_MODEL` if accuracy allows. Without the key, PDF/photo
-  uploads fail with an explanation and XML keeps working.
+- Default reader is **local**: PDF text layer, or Tesseract OCR for scans/photos (installed in the backend image;
+  needs ~1-4 s CPU per page). Accuracy is best on text-layer PDFs from accounting software, good on sharp scans
+  at 150+ dpi, and weakest on photos taken at an angle or in poor light. Always compare the first invoices of each
+  supplier with the original. e-Factura XML is exact and should be preferred wherever suppliers can send it.
+- `INVOICE_READER=ollama` adds a local LLM (e.g. run `ollama serve` with `qwen2.5:7b-instruct` on a machine with
+  enough RAM/GPU) to structure the text; it is tried first and the rule reader is the fallback. This path was tested
+  with a mocked server only, not with a real model: evaluate it on your own invoices before relying on it.
+- `INVOICE_READER=claude` is the cloud option (outbound HTTPS to `api.anthropic.com`, `ANTHROPIC_API_KEY`); it is
+  usually the most accurate on odd layouts and costs a few cents per invoice (estimate, measure it).
 - Mailbox: create one mailbox (e.g. `invoices@yourdomain`) that accepts plus-addresses, enable IMAP, and set
   `IMAP_*` and `INVOICE_INBOX_ADDRESS` on the **worker**. Messages are marked seen after handling; a message that
   crashed the processor stays unseen and is retried. Check `docker compose logs worker` for `invoice_mail_polled`.

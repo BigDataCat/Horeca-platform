@@ -122,6 +122,7 @@ def test_zip_and_pdf_attachments(client, company, monkeypatch):
     from app.services import invoice_ai
 
     tenant, address = company
+    monkeypatch.setattr(settings, "invoice_reader", "claude")
     monkeypatch.setattr(invoice_ai, "make_client", lambda: FakeClient(sample_invoice()))
     result, _ = poll([mail(address, [("123.zip", "application/zip", efactura_zip(ubl_invoice(number="Z1"))), ("scan.pdf", "application/pdf", PDF)])])
     assert result["imported"] == 2

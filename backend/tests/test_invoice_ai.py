@@ -38,6 +38,11 @@ def sample_invoice():
     )
 
 
+@pytest.fixture(autouse=True)
+def cloud_reader(monkeypatch):
+    monkeypatch.setattr(settings, "invoice_reader", "claude")
+
+
 @pytest.fixture()
 def ai(monkeypatch):
     fake = FakeClient(sample_invoice())
@@ -56,7 +61,10 @@ def test_pdf_is_read_by_ai_and_needs_review(client, tenant_a, ai):
     assert (header["supplier_name"], header["document_number"], header["currency"], header["issue_date"]) == ("Selgros SRL", "SG-55", "RON", "2026-10-01")
     lines = invoice["extracted"]["lines"]
     assert [(l["unit"], l["match"]) for l in lines] == [("EA", "name"), ("KG", None)]      # 'buc' -> EA, 'kg' -> KG
-    assert invoice["warnings"] == ["New supplier 'Selgros SRL' will be created when the receipt is posted"]  # numbers reconcile
+    assert invoice["warnings"] == [
+        "Read automatically from a PDF/photo: compare every line with the original before posting",
+        "New supplier 'Selgros SRL' will be created when the receipt is posted",
+    ]  # the numbers reconcile, so there are no other warnings
     assert any("not matched" in b for b in invoice["blocking"])                                # flour still needs a product
 
     flour = create_product(client, tenant_a, "Faina alba", base_uom="KG")

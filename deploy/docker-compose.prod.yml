@@ -23,6 +23,9 @@ x-backend-env: &backend-env
   SMTP_FROM: ${SMTP_FROM:-HoReCa Platform <no-reply@localhost>}
   APP_BASE_URL: https://${DOMAIN}
   TRIAL_DAYS: ${TRIAL_DAYS:-}
+  INVOICE_READER: ${INVOICE_READER:-local}
+  OLLAMA_URL: ${OLLAMA_URL:-}
+  OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b-instruct}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   INVOICE_AI_MODEL: ${INVOICE_AI_MODEL:-claude-opus-5-5}
   INVOICE_INBOX_ADDRESS: ${INVOICE_INBOX_ADDRESS:-}
